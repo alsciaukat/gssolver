@@ -2,7 +2,7 @@
 
 Solve for $\psi(r, z)$ in Grad-Shafranov equation:
 ```math
-r\frac{\partial}{\partial r}\left(\frac{1}{r}\frac{\partial \psi}{\partial r}\right) + \frac{\partial^2\psi}{\partial z^2} = -\mu_0 r^2 \frac{dp}{d\psi} - \frac{1}{2} \frac{d F^2}{d\psi}
+r\frac{\partial}{\partial r}\left(\frac{1}{r}\frac{\partial \psi}{\partial r}\right) + \frac{\partial^2\psi}{\partial z^2} = -\mu_0 r^2 \frac{dp}{d\psi} - \frac{1}{2} \frac{d g^2}{d\psi}
 ```
 using finite difference method.
 

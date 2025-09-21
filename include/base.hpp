@@ -30,5 +30,7 @@ public:
   Grid(size_t N, double R = 3, double a = 0.6, double b = 0.2, double c0 = 0.1,
        double k = 3, double tolerance = 0.1);
 
-  double solovev(double r, double z);
+  double interpolate_z(const Array<double> &psi, int i, int j, double zz) const;
+  double interpolate_r(const Array<double> &psi, int i, int j, double rr) const;
+  double solovev(double r, double z) const;
 };

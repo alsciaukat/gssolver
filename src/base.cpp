@@ -1,4 +1,4 @@
-#include <base.hpp>
+#include "base.hpp"
 #include <cmath>
 #include <stdexcept>
 
@@ -9,11 +9,11 @@ Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
     throw std::invalid_argument("Invalid parameters: a, b, c0");
 
   // initialize variables
-  r_max = sqrt(R * R + sqrt(8 * k / (a - c0)));
-  r_min = sqrt(R * R - sqrt(8 * k / (a - c0)));
+  r_max = std::sqrt(R * R + std::sqrt(8 * k / (a - c0)));
+  r_min = std::sqrt(R * R - std::sqrt(8 * k / (a - c0)));
   double p = c0 * c0 / (2 * (a - c0));
   double q = -(b + c0) * R * R / 2;
-  z_max = sqrt((-q - sqrt(q * q - 4 * p * k)) / (2 * p));
+  z_max = std::sqrt((-q - std::sqrt(q * q - 4 * p * k)) / (2 * p));
   z_min = -z_max;
 
   h = (r_max - r_min + 2 * tolerance) / (N - 1);
@@ -35,18 +35,18 @@ Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
   for (int j = 0; j < N_z; j++) {
     if (z[j] < z_min || z[j] > z_max)
       continue;
-    double r_l = sqrt(R * R - 2 * c0 * z[j] * z[j] / (a - c0) -
+    double r_l = std::sqrt(R * R - 2 * c0 * z[j] * z[j] / (a - c0) -
                       2 *
-                          sqrt(c0 * c0 * std::pow(z[j], 4) + 2 * (a - c0) * k -
+                          std::sqrt(c0 * c0 * std::pow(z[j], 4) + 2 * (a - c0) * k -
                                (a - c0) * (b + c0) * R * R * z[j] * z[j]) /
                           (a - c0));
     int i_l = static_cast<int>(ceil((r_l - r[0]) / h));
     double alpha_1l = (r[i_l] - r_l) / h;
     boundary[i_l][j] = {Domain::BDRY, alpha_1l, 1, 1, 1};
 
-    double r_r = sqrt(R * R - 2 * c0 * z[j] * z[j] / (a - c0) +
+    double r_r = std::sqrt(R * R - 2 * c0 * z[j] * z[j] / (a - c0) +
                       2 *
-                          sqrt(c0 * c0 * std::pow(z[j], 4) + 2 * (a - c0) * k -
+                          std::sqrt(c0 * c0 * std::pow(z[j], 4) + 2 * (a - c0) * k -
                                (a - c0) * (b + c0) * R * R * z[j] * z[j]) /
                           (a - c0));
     int i_r = static_cast<int>(floor((r_r - r[0]) / h));
@@ -65,7 +65,7 @@ Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
     if (r[i] < r_min || r[i] > r_max)
       continue;
     double z_b =
-        -sqrt((2 * k - (a - c0) * std::pow(r[i] * r[i] - R * R, 2) / 4) /
+        -std::sqrt((2 * k - (a - c0) * std::pow(r[i] * r[i] - R * R, 2) / 4) /
               ((b + c0) * R * R + c0 * (r[i] * r[i] - R * R)));
     int j_b = static_cast<int>(ceil((z_b - z[0]) / h));
     double beta_1b = (z[j_b] - z_b) / h;
@@ -80,7 +80,19 @@ Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
   }
 }
 
-double Grid::solovev(double r, double z) {
+double Grid::solovev(double r, double z) const {
   return 0.5 * (b + c0) * R * R * z * z + 0.5 * c0 * (r * r - R * R) * z * z +
          (a - c0) * std::pow(r * r - R * R, 2) / 8;
+}
+
+double Grid::interpolate_z(const Array<double> &psi, int i, int j, double zz) const {
+  return (zz - z[j - 1]) * (zz - z[j]) *
+			 (psi[i][j + 1] - 2 * psi[i][j] + psi[i][j - 1]) / (2 * h * h) +
+		 (zz - z[j - 1]) * (psi[i][j] - psi[i][j - 1]) / h + psi[i][j - 1];
+}
+
+double Grid::interpolate_r(const Array<double> &psi, int i, int j, double rr) const {
+  return (rr - r[i - 1]) * (rr - r[i]) *
+             (psi[i + 1][j] - 2 * psi[i][j] + psi[i - 1][j]) / (2 * h * h) +
+         (rr - r[i - 1]) * (psi[i][j] - psi[i - 1][j]) / h + psi[i - 1][j];
 }
