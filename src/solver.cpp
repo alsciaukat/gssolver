@@ -1,26 +1,27 @@
 #include <iostream>
 #include <iomanip>
-#include "base.hpp"
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
 // #include <cassert>
 #include <ranges>
 
+#include "base.hpp"
+#include "dataio.hpp"
 /*
   Solov'ev's Solution
 
     psi(r, z) := 0.5 (b + c0) R^2 z^2 + c0 R zeta(r) z^2 + 0.5 (a - c0) R^2
     zeta(r)^2 zeta(r) := (r^2 - R^2)/(2R)
 
-  
+
   We use the boundary given by Solov'ev's solution
 
     psi(r, z) = k
-	
-  with default parameters:
 
-    R = 3, a = 0.6, b = 0.2, c0 = 0.1, k = 3
+  with default parameters based on the dimension of KSTAR:
+
+    R = 1.8, a = 0.5, b = 0.5, c0 = 0.1, k = 0.11
 */
 
 double e_fix = 0.01;
@@ -32,11 +33,13 @@ double Ip = 500e3, psi_bdry = 0.1;
 double psi_l = 1;
 
 double p_prime(double psi) {
-  return 3*A*A/(4*mu0)*(sigma*sigma - sigma)/std::pow(psi, 7);
+  // return 3*A*A/(4*mu0)*(sigma*sigma - sigma)/std::pow(psi, 7);
+  return 0.5;
 }
 
 double gg_prime(double psi) {
-  return A/(4*std::pow(psi, 3));
+  // return A/(4*std::pow(psi, 3));
+  return -0.2*3*3;
 }
 
 void update_F(const Grid& grid, Array<double>& psi, Array<double>& F) {
@@ -144,10 +147,6 @@ void sor(const Grid& grid, Array<double>& psi, const Array<double>& F, const dou
   bool converged;  
   int n_it = 0;
   do {
-	n_it++;
-	if (n_it % 10 == 0)
-	  std::cout << "SOR Iteration: " << n_it << "\n";
-
     converged = true;
 	for (int i = 0; i < grid.N_r; i++) {
 	  for (int j = 0; j < grid.N_z; j++) {
@@ -248,6 +247,8 @@ int main() {
 	normalize(grid, psi);
   } while (!is_converged(psi_p, psi));
 
+
+  store_netcdf(psi, "result.nc", "psi");
   print_array(psi);
 
   return 0;

@@ -15,6 +15,9 @@ Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
   double q = -(b + c0) * R * R / 2;
   z_max = std::sqrt((-q - std::sqrt(q * q - 4 * p * k)) / (2 * p));
   z_min = -z_max;
+  if (std::isnan(r_min) || std::isnan(r_max) || std::isnan(z_max))
+	throw std::invalid_argument(
+		"The parameters are unphysical. Try setting k lower.");
 
   h = (r_max - r_min + 2 * tolerance) / (N - 1);
   N_r = N;
