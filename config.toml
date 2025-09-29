@@ -1,0 +1,20 @@
+[grid]
+type = "solovev"
+N = 11
+
+# These are the default values
+# N = 11
+# R = 1.8
+# a = 0.5
+# b = 0.5
+# c0 = 0.1
+k = 0.05
+# tolerance = 0.1
+
+[output]
+format = "netCDF" # netCDF or csv
+name = "result.nc"
+
+
+[initial_condition]
+type = "solovev"

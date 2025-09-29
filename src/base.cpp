@@ -1,10 +1,10 @@
 #include "base.hpp"
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
 
-Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
-           double tolerance)
-    : R(R), a(a), b(b), c0(c0), k(k), tolerance(tolerance) {
+Grid::Grid(const Parameters &param)
+    : R(param.R), a(param.a), b(param.b), c0(param.c0), k(param.k), tolerance(param.tolerance) {
   if (c0 > a || -b > c0)
     throw std::invalid_argument("Invalid parameters: a, b, c0");
 
@@ -19,8 +19,8 @@ Grid::Grid(size_t N, double R, double a, double b, double c0, double k,
 	throw std::invalid_argument(
 		"The parameters are unphysical. Try setting k lower.");
 
-  h = (r_max - r_min + 2 * tolerance) / (N - 1);
-  N_r = N;
+  h = (r_max - r_min + 2 * tolerance) / (param.N - 1);
+  N_r = param.N;
   N_z = static_cast<int>(ceil((z_max - z_min + 2 * tolerance) / h)) + 1;
 
   boundary.resize(N_r);
@@ -88,14 +88,50 @@ double Grid::solovev(double r, double z) const {
          (a - c0) * std::pow(r * r - R * R, 2) / 8;
 }
 
-double Grid::interpolate_z(const Array<double> &psi, int i, int j, double zz) const {
+template class Field<double>;
+
+template <typename T>
+double Field<T>::interpolate_z(int i, int j, double zz) const {
+  const std::vector<double> &z = grid.z;
+  const std::vector<double> &r = grid.r;
+  const double h = grid.h;
   return (zz - z[j - 1]) * (zz - z[j]) *
-			 (psi[i][j + 1] - 2 * psi[i][j] + psi[i][j - 1]) / (2 * h * h) +
-		 (zz - z[j - 1]) * (psi[i][j] - psi[i][j - 1]) / h + psi[i][j - 1];
+	(value[i][j + 1] - 2 * value[i][j] + value[i][j - 1]) / (2 * h * h) +
+	(zz - z[j - 1]) * (value[i][j] - value[i][j - 1]) / h + value[i][j - 1];
 }
 
-double Grid::interpolate_r(const Array<double> &psi, int i, int j, double rr) const {
+template <typename T>
+double Field<T>::interpolate_r(int i, int j, double rr) const {
+  const std::vector<double> &z = grid.z;
+  const std::vector<double> &r = grid.r;
+  const double h = grid.h;
   return (rr - r[i - 1]) * (rr - r[i]) *
-             (psi[i + 1][j] - 2 * psi[i][j] + psi[i - 1][j]) / (2 * h * h) +
-         (rr - r[i - 1]) * (psi[i][j] - psi[i - 1][j]) / h + psi[i - 1][j];
+	(value[i + 1][j] - 2 * value[i][j] + value[i - 1][j]) / (2 * h * h) +
+	(rr - r[i - 1]) * (value[i][j] - value[i - 1][j]) / h + value[i - 1][j];
 }
+
+template <typename T>
+Field<T>::Field(const Grid &grid, const Parameters &param, T initial_value) : value(grid.N_r, std::vector<T>(grid.N_z, initial_value)), grid(grid) {};
+
+template <typename T>
+T &Field<T>::operator[](std::size_t i, std::size_t j) {
+  return value[i][j];
+}
+
+template <typename T>
+Field<T> &Field<T>::operator=(const Field<T> &other) {
+  if (this != &other) {
+	value = other.value;
+  }    
+  return *this;
+}
+
+InitialCondition::InitialCondition(const Parameters &param) : param(param) {};
+
+double SolovevCondition::p_prime(double psi) {
+  return -param.a;
+}
+
+double SolovevCondition::gg_prime(double psi) {
+  return -param.b * param.R * param.R;
+}  
