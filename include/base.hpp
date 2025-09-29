@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <string>
 #include <vector>
-#include <numbers>
 
 template <typename T>
 using Array = std::vector<std::vector<T>>;
@@ -24,17 +23,16 @@ struct BoundaryInfo {
 };
 
 struct Parameters {
+  std::string gtype;
   int N;
   double R, a, b, c0, k, tolerance;
-  double e_fix = 0.01, e_sor = 0.01, e_min = 0.01, omega = 1.9; // relaxation coefficient. 2 diverges.
-  double A = 1;
-  double mu0 = 4 * std::numbers::pi * 1e-7;
-  double sigma = 0.5;
-  double Ip = 500e3, psi_bdry = 0.1;
-  double psi_l = 1;
+  double e_fix, e_sor, e_min, omega;
+  double I_p, psi_bdry;
+  double psi_l;
   std::string ofname;
   std::string offormat;
   std::string ictype;
+  double A;
 };
 
 class Grid {
@@ -48,8 +46,6 @@ public:
   Array<BoundaryInfo> boundary;
 
   Grid(const Parameters &param);
-
-  double solovev(double r, double z) const;
 };
 
 template<typename T>

@@ -1,6 +1,5 @@
 #include "dataio.hpp"
 #include <cstddef>
-#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <ranges>

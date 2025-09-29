@@ -1,14 +1,32 @@
 #include "base.hpp"
 #include <cmath>
-#include <cstddef>
 #include <stdexcept>
 
 Grid::Grid(const Parameters &param)
-    : R(param.R), a(param.a), b(param.b), c0(param.c0), k(param.k), tolerance(param.tolerance) {
+	: R(param.R), a(param.a), b(param.b), c0(param.c0), k(param.k),
+	  tolerance(param.tolerance) {
+  /*
+    Solov'ev's solution is used to set the boundary.
+    The p(psi) and g(psi) might not match the
+    Solov'ev's, but they are used anyway assuming that it is not going to be far
+    from the reality.
+
+    The boundary is given by the flux surface given by:
+      ψ(r, z) = k
+    where
+      ψ(r, z) := 0.5 (b + c₀) R² z² + c₀ R ζ(r) z²+ 0.5 (a - c₀) R² ζ(r)²
+	  ζ(r) := (r² - R²)/(2R)
+    with default parameters based on the dimension of KSTAR:
+      R = 1.8, a = 0.5, b = 0.5, c₀ = 0.1, k = 0.11
+
+	See /Vaccum solution for Solov'ev's equilibraum configuration in tokamaks/
+	by Tao Xu and Richard Fitzpatrick.
+  */
+
   if (c0 > a || -b > c0)
     throw std::invalid_argument("Invalid parameters: a, b, c0");
 
-  // initialize variables
+  // analytically find the bounding box of the boundary.
   r_max = std::sqrt(R * R + std::sqrt(8 * k / (a - c0)));
   r_min = std::sqrt(R * R - std::sqrt(8 * k / (a - c0)));
   double p = c0 * c0 / (2 * (a - c0));
@@ -19,6 +37,8 @@ Grid::Grid(const Parameters &param)
 	throw std::invalid_argument(
 		"The parameters are unphysical. Try setting k lower.");
 
+  // automatically calculate the number of points in z direction
+  // to have the same spacing as in r.
   h = (r_max - r_min + 2 * tolerance) / (param.N - 1);
   N_r = param.N;
   N_z = static_cast<int>(ceil((z_max - z_min + 2 * tolerance) / h)) + 1;
@@ -34,7 +54,15 @@ Grid::Grid(const Parameters &param)
   for (int j = 0; j < N_z; j++)
     z[j] = z_min - tolerance + j * h;
 
-  // find boundary in r direction
+  // analytically find the inhomogeneity at the boundary.
+  // `alpha` and `beta` represent the relative distance
+  // from the last interior point to the boundary
+  // compared to the regular spacing `h`.
+  // 
+  // If boundary point has less r coordinate then the last adjacent interior point (LAIP),
+  // `alpha1` is set at the LAIP in the `BoundaryInfo`.
+  // Similarly, `alpha2` if greater r coordinate, `beta_1` if less r coordinate,
+  // `beta2` if greater r coordinate.
   for (int j = 0; j < N_z; j++) {
     if (z[j] < z_min || z[j] > z_max)
       continue;
@@ -63,7 +91,6 @@ Grid::Grid(const Parameters &param)
       boundary[i][j] = {Domain::INT, 1, 1, 1, 1};
   }
 
-  // find boundary in z direction
   for (int i = 0; i < N_r; i++) {
     if (r[i] < r_min || r[i] > r_max)
       continue;
@@ -83,13 +110,15 @@ Grid::Grid(const Parameters &param)
   }
 }
 
-double Grid::solovev(double r, double z) const {
-  return 0.5 * (b + c0) * R * R * z * z + 0.5 * c0 * (r * r - R * R) * z * z +
-         (a - c0) * std::pow(r * r - R * R, 2) / 8;
-}
+// double Grid::solovev(double r, double z) const {
+//   return 0.5 * (b + c0) * R * R * z * z + 0.5 * c0 * (r * r - R * R) * z * z +
+//          (a - c0) * std::pow(r * r - R * R, 2) / 8;
+// }
 
 template class Field<double>;
 
+
+// interpolation is done using the second order Newton polynomials
 template <typename T>
 double Field<T>::interpolate_z(int i, int j, double zz) const {
   const std::vector<double> &z = grid.z;
@@ -126,7 +155,9 @@ Field<T> &Field<T>::operator=(const Field<T> &other) {
   return *this;
 }
 
+// abstract class for initial conditions
 InitialCondition::InitialCondition(const Parameters &param) : param(param) {};
+
 
 double SolovevCondition::p_prime(double psi) {
   return -param.a;

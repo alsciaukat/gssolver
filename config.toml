@@ -1,20 +1,52 @@
+#############################################################################
+# Default values are used if any of the following is not specified.         #
+# Look at the function `initialize` in `solver.cpp` for the default values. #
+#############################################################################
+
 [grid]
+
+# currently have no effect
 type = "solovev"
+
+# The number of points in the r direction
 N = 11
 
-# These are the default values
-# N = 11
-# R = 1.8
-# a = 0.5
-# b = 0.5
-# c0 = 0.1
-k = 0.05
-# tolerance = 0.1
 
+# The default format is chosen automatically
+# depending on the availability of libraries.
 [output]
-format = "netCDF" # netCDF or csv
+
+# "netCDF" and "csv" are supported.
+# The case does not matter.
+# format = "netCDF"
+
 name = "result.nc"
 
+[solver] 
+
+# relative error for the fixed-point iteration
+e_fix = 0.01
+
+# relative error for Succesive Over Relaxation
+e_sor = 0.01
+# relaxation coefficient. Diverges if ≥ 2.
+omega = 1.9
+
+# relative error for the minimum at the normalization step
+e_min = 0.01 
+
+# The total current
+I_p = 500e3
+
+# psi at the computational boundary
+psi_l = 1
+
+# psi at the physical plasma boudnary
+psi_bdry = 0.1
 
 [initial_condition]
+
+# Choose p(psi) and g(psi)
+# "solovev" and "quadratic" are supported.
 type = "solovev"
+
