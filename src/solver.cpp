@@ -305,12 +305,12 @@ int main() {
 
   if (offormat_l == "netcdf") {
 #ifdef USE_NETCDF
-    store_netcdf(psi.value, param.ofname, "psi");
+    store_netcdf(psi, param.ofname, "psi");
 #else
     throw std::invalid_argumet("Output to NetCDF is not supported. Change output.format to csv");
 #endif
   } else if (offormat_l == "csv") {
-	store_csv(psi.value, param.ofname);
+	store_csv(psi, param.ofname);
   } else {
 	throw std::invalid_argument("No output is written. Current output.format is not supported.");
   }    

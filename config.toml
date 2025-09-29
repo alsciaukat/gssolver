@@ -9,7 +9,7 @@
 type = "solovev"
 
 # The number of points in the r direction
-N = 11
+N = 200
 
 
 # The default format is chosen automatically
