@@ -305,7 +305,7 @@ int main() {
 
   if (offormat_l == "netcdf") {
 #ifdef USE_NETCDF
-    store_netcdf(psi, param.ofname, "psi");
+    store_netcdf(psi, F, param.ofname);
 #else
     throw std::invalid_argumet("Output to NetCDF is not supported. Change output.format to csv");
 #endif
@@ -314,7 +314,7 @@ int main() {
   } else {
 	throw std::invalid_argument("No output is written. Current output.format is not supported.");
   }    
-  print_array(psi.value);
+  // print_array(psi.value);
 
   return EXIT_SUCCESS;
 }

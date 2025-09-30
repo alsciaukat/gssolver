@@ -8,13 +8,15 @@
 
 using namespace netCDF;
 
-int store_netcdf(const Field<double> &field, const std::string &fname,
-				 const std::string &vname) {
-  std::vector<double> flat_arr;
-  for (double x : field.value | std::views::join)
-	flat_arr.push_back(x);
-  size_t N_r = field.value.size();
-  size_t N_z = field.value[0].size();
+int store_netcdf(const Field<double> &psi, const Field<double> &F, const std::string &fname) {
+  std::vector<double> psi_f;
+  std::vector<double> F_f;
+  for (double x : psi.value | std::views::join)
+	psi_f.push_back(x);
+  for (double x : F.value | std::views::join)
+	F_f.push_back(x);
+  size_t N_r = psi.value.size();
+  size_t N_z = psi.value[0].size();
   NcFile file(fname, NcFile::replace);
   NcDim rDim = file.addDim("r", N_r);
   NcDim zDim = file.addDim("z", N_z);
@@ -22,10 +24,12 @@ int store_netcdf(const Field<double> &field, const std::string &fname,
 
   NcVar r = file.addVar("r", ncDouble, rDim);
   NcVar z = file.addVar("z", ncDouble, zDim);
-  NcVar var = file.addVar(vname, ncDouble, dims);
-  r.putVar(field.grid.r.data());
-  z.putVar(field.grid.z.data());
-  var.putVar(flat_arr.data());
+  NcVar psi_v = file.addVar("psi", ncDouble, dims);
+  NcVar F_v = file.addVar("F", ncDouble, dims);
+  r.putVar(psi.grid.r.data());
+  z.putVar(psi.grid.z.data());
+  psi_v.putVar(psi_f.data());
+  F_v.putVar(F_f.data());
   return EXIT_SUCCESS;
 }
 
