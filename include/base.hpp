@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+extern const double mu0;
+
 template <typename T>
 using Array = std::vector<std::vector<T>>;
 
@@ -32,6 +34,7 @@ struct Parameters {
   std::string ofname;
   std::string offormat;
   std::string ictype;
+  double beta0, m, n;
   double A;
 };
 
@@ -54,7 +57,7 @@ public:
   Array<T> value;
   const Grid &grid;
 
-  Field(const Grid &grid, const Parameters &param, T initial_value);
+  Field(const Grid &grid, const Parameters &param, T initial_value = 0);
 
   T &operator[](std::size_t i, std::size_t j);
   Field<T> &operator=(const Field<T> &other);
@@ -78,7 +81,7 @@ public:
   double gg_prime(double psi) override;  
 };
 
-class QuadraticCondition : public InitialCondition {
+class PolynomialCondition : public InitialCondition {
   using InitialCondition::InitialCondition;
   double p_prime(double psi) override;  
   double gg_prime(double psi) override;  

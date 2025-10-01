@@ -9,7 +9,7 @@
 type = "solovev"
 
 # The number of points in the r direction
-N = 200
+N = 100
 
 
 # The default format is chosen automatically
@@ -20,20 +20,20 @@ N = 200
 # The case does not matter.
 # format = "netCDF"
 
-name = "result.nc"
+name = "polynomial.nc"
 
 [solver] 
 
 # relative error for the fixed-point iteration
-e_fix = 0.01
+e_fix = 0.005
 
 # relative error for Succesive Over Relaxation
-e_sor = 0.01
+e_sor = 0.001
 # relaxation coefficient. Diverges if ≥ 2.
-omega = 1.9
+omega = 1
 
 # relative error for the minimum at the normalization step
-e_min = 0.01 
+e_min = 0.001 
 
 # The total current
 I_p = 500e3
@@ -47,6 +47,10 @@ psi_bdry = 0.1
 [initial_condition]
 
 # Choose p(psi) and g(psi)
-# "solovev" and "quadratic" are supported.
-type = "solovev"
+# "solovev" and "polynomial" are supported.
+type = "polynomial"
+beta0 = 0.5
+m = 2
+n = 1
+
 

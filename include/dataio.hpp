@@ -7,7 +7,7 @@
 #ifdef USE_NETCDF
 
 #include <netcdf>
-int store_netcdf(const Field<double>& psi, const Field<double> &F, const std::string& fname);
+int store_netcdf(Field<double>& psi, Field<double> &F, const double &sigma, const InitialCondition &cond, const Parameters &param);
 
 #endif
 

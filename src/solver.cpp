@@ -1,7 +1,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <numbers>
+#include <memory>
 #include <stdexcept>
 #include <ranges>
 #include <string>
@@ -9,8 +9,6 @@
 
 #include "base.hpp"
 #include "dataio.hpp"
-
-const double mu0 = 4 * std::numbers::pi * 1e-7;
 
 void update_F(Field<double> &F, Field<double> &psi, InitialCondition &cond, const Parameters &param) {
   const Grid &grid = psi.grid;
@@ -35,8 +33,8 @@ void update_sigma(double &sigma, Field<double> &F, const Parameters &param) {
       I += F[i, j] / (mu0 * r[i]) * grid.h * grid.h;
     }
   }
-
-  sigma = param.I_p / (param.psi_bdry * I);
+  if (I == 0) sigma = 1;
+  else sigma = param.I_p / (param.psi_bdry * I);
 }
 
 void normalize(Field<double> &psi, const Parameters &param) {
@@ -47,6 +45,7 @@ void normalize(Field<double> &psi, const Parameters &param) {
   int j_min;
   for (int i = 0; i < grid.N_r; i++) {
     for (int j = 0; j < grid.N_z; j++) {
+	  if (grid.boundary[i][j].domain == Domain::EXT) continue;
       if (psi[i, j] < psi_min) {
         psi_min = psi[i, j];
         i_min = i;
@@ -199,12 +198,20 @@ bool is_converged(Field<double> &psi_p, Field<double> &psi, const Parameters &pa
   bool converged = true;
   double N_r = psi.value.size();
   double N_z = psi.value[0].size();
+  double error = 0;
+  const Grid &grid = psi.grid;
   for (int i = 0; i < N_r; i++) {
     for (int j = 0; j < N_z; j++) {
-      if (std::abs((psi[i, j] - psi_p[i, j]) / psi[i, j]) > param.e_fix)
-        converged = false;
+	  if (grid.boundary[i][j].domain != Domain::INT)
+		continue;
+	  double error_t = std::abs((psi[i, j] - psi_p[i, j]) / psi[i, j]);
+	  if (error_t > param.e_fix) {
+		converged = false;
+	  }
+	  if (error_t > error) error = error_t;
     }
   }
+  std::cout << std::setprecision(10) << "Error: " << error << std::endl << std::setprecision(6);
   return converged;
 }
 
@@ -237,6 +244,9 @@ int initialize(Parameters &param) {
   SET(output, name, std::string, ofname, "result.csv")
 #endif
   SET(initial_condition, type, std::string, ictype, "solovev");
+  SET(initial_condition, beta0, double, beta0, 0.5);
+  SET(initial_condition, m, double, m, 2);
+  SET(initial_condition, n, double, n, 1);
   SET(solver, e_fix, double, e_fix, 0.01);
   SET(solver, e_sor, double, e_sor, 0.01);
   SET(solver, e_min, double, e_min, 0.01);
@@ -252,20 +262,24 @@ get_initial_condition(const Parameters &param) {
   // *factory pattern*
   // this function returns a pointer to
   // a concrete class of `InitialCondition`.
+  if (param.ictype == "polynomial") return std::make_unique<PolynomialCondition>(param);
   return std::make_unique<SolovevCondition>(param);
 }
 
 int main() {
   // initializations
-  std::cout << std::fixed << std::setprecision(2);
+  std::cout << std::fixed << std::setprecision(6);
   Parameters param;
   initialize(param);
   auto cond = get_initial_condition(param);
   Grid grid(param);
-  Field<double> psi(grid, param, 1);
-  Field<double> psi_p(grid, param, 1);
+  Field<double> psi(grid, param, 0);
+  Field<double> psi_p(grid, param, 0);
   Field<double> F(grid, param, 0);
   double sigma;
+
+  update_F(F, psi, *cond, param);
+  update_sigma(sigma, F, param);
 
   int n_fix = 0;
   do {
@@ -290,13 +304,14 @@ int main() {
     std::cout << "\nFixed-point Iteration: " << n_fix << "\n";
 
     psi_p = psi;
-    update_F(F, psi, *cond, param);
-    update_sigma(sigma, F, param);
-    std::cout.unsetf(std::ios::fixed);
-    std::cout << "Sigma: " << sigma << "\n" << std::fixed;
+	std::cout << "Sigma: "<< sigma << "\n";
 
     sor(psi, F, sigma, param);
     normalize(psi, param);
+
+	update_F(F, psi, *cond, param);
+	update_sigma(sigma, F, param);
+
   } while (!is_converged(psi_p, psi, param));
 
   // output to a file 
@@ -305,7 +320,7 @@ int main() {
 
   if (offormat_l == "netcdf") {
 #ifdef USE_NETCDF
-    store_netcdf(psi, F, param.ofname);
+    store_netcdf(psi, F, sigma, *cond, param);
 #else
     throw std::invalid_argumet("Output to NetCDF is not supported. Change output.format to csv");
 #endif

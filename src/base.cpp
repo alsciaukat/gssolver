@@ -1,6 +1,9 @@
 #include "base.hpp"
 #include <cmath>
 #include <stdexcept>
+#include <numbers>
+
+const double mu0 = 4 * std::numbers::pi * 1e-7;
 
 Grid::Grid(const Parameters &param)
 	: R(param.R), a(param.a), b(param.b), c0(param.c0), k(param.k),
@@ -165,4 +168,12 @@ double SolovevCondition::p_prime(double psi) {
 
 double SolovevCondition::gg_prime(double psi) {
   return -param.b * param.R * param.R;
+}
+
+double PolynomialCondition::p_prime(double psi) {
+  return param.beta0 * std::pow(1 - std::pow(psi, param.m), param.n) / param.R;
+}  
+
+double PolynomialCondition::gg_prime(double psi) {
+  return (1 - param.beta0) * mu0 * param.R * std::pow(1 - std::pow(psi, param.m), param.n);
 }  
