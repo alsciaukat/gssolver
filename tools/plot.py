@@ -47,6 +47,8 @@ R_poly, Z_poly = np.meshgrid(r_poly, z_poly, indexing="ij")
 Rrp_poly, Zrp_poly = np.meshgrid(r_poly[:-1], z_poly, indexing="ij")
 Rzp_poly, Zzp_poly = np.meshgrid(r_poly, z_poly[:-1], indexing="ij")
 
+psi_theory_poly = solovev(R_poly, Z_poly)
+
 
 def compare(numerical, theory, R, Z):
     fig, axes = plt.subplots(1, 1, figsize=(10, 6))
@@ -84,8 +86,9 @@ def show_field(R, Z, field, title: str):
 
 if __name__ == "__main__":
     # compare(psi_solovev, psi_theory, R_solovev, Z_solovev)
+    compare(psi_poly, psi_theory_poly, R_poly, Z_poly)
     # show_field(R_solovev, Z_solovev, J_phi_solovev, "J_ϕ")
     # show_field(Rrp_solovev, Zrp_solovev, B_z_solovev, "B_z")
-    show_psi(R_poly, Z_poly, psi_poly, "psi")
-    show_field(Rrp_poly, Zrp_poly, B_z_poly, "B_z")
+    # show_psi(R_poly, Z_poly, psi_poly, "psi")
+    # show_field(Rrp_poly, Zrp_poly, B_z_poly, "B_z")
     # show_field(R_poly, Z_poly, J_phi_poly, "J_ϕ")

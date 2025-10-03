@@ -1,5 +1,7 @@
 .cache/
-dump
 build/
 compile_commands.json
 secret
+config.toml
+*.nc
+*.csv

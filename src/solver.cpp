@@ -16,7 +16,7 @@ void update_F(Field<double> &F, Field<double> &psi, InitialCondition &cond, cons
   for (int i = 0; i < grid.N_r; i++) {
     for (int j = 0; j < grid.N_z; j++) {
       F[i, j] = -(mu0 * r[i] * r[i] * cond.p_prime(psi[i, j]) +
-                  cond.gg_prime(psi[i, j]));
+                  cond.gg_prime(psi[i, j])) + 1e-100;
     }
   }
 }
@@ -148,7 +148,7 @@ void sor(Field<double> &psi, Field<double> &F,
         double psi_delta;
         if (boundary[i][j].domain == Domain::INT) {
           psi_delta =
-              ((1 - h / r[i]) * psi[i + 1, j] + (1 + h / r[i]) * psi[i - 1, j] -
+			((1 - h / (2*r[i])) * psi[i + 1, j] + (1 + h / (2*r[i])) * psi[i - 1, j] -
                4 * psi[i, j] + psi[i, j + 1] + psi[i, j - 1] -
                h * h * sigma * F[i, j]) /
               4;
@@ -243,6 +243,7 @@ int initialize(Parameters &param) {
   SET(output, format, std::string, offormat, "csv")
   SET(output, name, std::string, ofname, "result.csv")
 #endif
+  SET(output, print, bool, print, false)
   SET(initial_condition, type, std::string, ictype, "solovev");
   SET(initial_condition, beta0, double, beta0, 0.5);
   SET(initial_condition, m, double, m, 2);
@@ -273,8 +274,8 @@ int main() {
   initialize(param);
   auto cond = get_initial_condition(param);
   Grid grid(param);
-  Field<double> psi(grid, param, 0);
-  Field<double> psi_p(grid, param, 0);
+  Field<double> psi(grid, param, 1);
+  Field<double> psi_p(grid, param, 1);
   Field<double> F(grid, param, 0);
   double sigma;
 
@@ -321,15 +322,17 @@ int main() {
   if (offormat_l == "netcdf") {
 #ifdef USE_NETCDF
     store_netcdf(psi, F, sigma, *cond, param);
+	std::cout << "Wrote to: " << param.ofname << std::endl;
 #else
     throw std::invalid_argumet("Output to NetCDF is not supported. Change output.format to csv");
 #endif
   } else if (offormat_l == "csv") {
 	store_csv(psi, param.ofname);
+	std::cout << "Wrote to: " << param.ofname << std::endl;
   } else {
 	throw std::invalid_argument("No output is written. Current output.format is not supported.");
   }    
-  // print_array(psi.value);
+  if (param.print) print_array(psi.value);
 
   return EXIT_SUCCESS;
 }

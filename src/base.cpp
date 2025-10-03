@@ -163,11 +163,11 @@ InitialCondition::InitialCondition(const Parameters &param) : param(param) {};
 
 
 double SolovevCondition::p_prime(double psi) {
-  return -param.a;
+  return - param.a / mu0;
 }
 
 double SolovevCondition::gg_prime(double psi) {
-  return -param.b * param.R * param.R;
+  return - param.b * param.R * param.R;
 }
 
 double PolynomialCondition::p_prime(double psi) {

@@ -21,19 +21,20 @@ N = 100
 # format = "netCDF"
 
 name = "polynomial.nc"
+print = false
 
 [solver] 
 
 # relative error for the fixed-point iteration
-e_fix = 0.005
+e_fix = 1e-6
 
 # relative error for Succesive Over Relaxation
-e_sor = 0.001
+e_sor = 1e-8
 # relaxation coefficient. Diverges if ≥ 2.
-omega = 1
+omega = 1.8
 
 # relative error for the minimum at the normalization step
-e_min = 0.001 
+e_min = 1e-6
 
 # The total current
 I_p = 500e3
@@ -49,7 +50,7 @@ psi_bdry = 0.1
 # Choose p(psi) and g(psi)
 # "solovev" and "polynomial" are supported.
 type = "polynomial"
-beta0 = 0.5
+beta0 = 0.1
 m = 2
 n = 1
 

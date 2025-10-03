@@ -34,6 +34,7 @@ struct Parameters {
   std::string ofname;
   std::string offormat;
   std::string ictype;
+  bool print;
   double beta0, m, n;
   double A;
 };
