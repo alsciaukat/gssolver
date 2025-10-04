@@ -94,7 +94,7 @@ def calc_B(psi, r, z, g=None):
     else:
         return B_r, B_z, np.zeros_lie(B_r)
 
-def plot_2D_vector(B_r, B_z, B_theta=None, r=None, z=None, step=5, mode='stream', title=None ):
+def plot_vector(B_r, B_z, B_theta=None, r=None, z=None, step=5, mode='stream', title=None ):
     if r is None or z is None: # if r, z is not provided, make it
         r = np.arange(B_z.shape[0])
         z = np.arange(B_r.shape[1])
@@ -138,5 +138,5 @@ if __name__ == "__main__":
     B_r, B_z, B_theta = calc_B(psi=psi, r=r, z=z, g=g)
     # plot2D(psi, r, z, title='psi')
     # plots2D([B_r, B_z, B_theta], r=r, z=z, titles=['B_r', 'B_z', 'B_theta'])
-    # plot_2D_vector(B_r, B_z, r=r, z=z, mode='qiuver')
-    plot_2D_vector(B_r, B_z, B_theta=B_theta, r=r, z=z, mode='qiuver')
+    # plot_vector(B_r, B_z, r=r, z=z, mode='qiuver')
+    plot_vector(B_r, B_z, B_theta=B_theta, r=r, z=z, mode='qiuver')
