@@ -3,16 +3,17 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-# ds = nc.Dataset('result.nc', "r")
-ds = nc.Dataset('polynomial.nc', "r")
+file_name = 'polynomial.nc'
+ds = nc.Dataset(file_name, "r")
 print(ds)
 
-# Let's calculate B_z, B_r
-# B_theta is a little treaky.
-
+"""
+# Let's calculate & plot B_z, B_r, B_theta
+# B_r, B_z are easy to calculrate, but B_theta is not.
 # B_r = - 1/r * dpsi/dz
 # B_z = 1/r * dpsi/dr
-# B_theta = 1/r * F(psi)
+# B_theta = 1/r * g(psi)
+"""
 
 psi = ds.variables['psi'][:] # axis=0 is z. axis=1 is r
 r = ds.variables['r'][:]
@@ -26,7 +27,7 @@ m = int( ds.getncattr("m") )
 type = ds.getncattr("type")
 beta0 = ds.getncattr("beta0")
 mu0 = 4 * np.pi * 1e-7
-print(psi.shape)
+print('shape of psi:', psi.shape)
 
 """
 for solov'ev solution, gg_prime = - b * R**2 (constant)
@@ -64,7 +65,6 @@ def plot2D(f, r=None, z=None, title=None):
     fig.colorbar(plot, ax=ax, fraction=0.04, pad=0.02)
     plt.show()
 
-
 def plots2D(fs, r=None, z=None, titles=None):
     n = len(fs)
     fig, axes = plt.subplots(ncols=n, figsize=(4*n, 3))
@@ -74,9 +74,10 @@ def plots2D(fs, r=None, z=None, titles=None):
         if r is None or z is None:
             plot = ax.imshow(f.T)
         else:
-            
             plot = ax.pcolormesh(R, Z, f[:-1, :-1])
         ax.set_title(title)
+        ax.set_aspect('equal'); ax.set_xlabel('r'); ax.set_ylabel('z')
+        
     fig.colorbar(plot, ax=axes, fraction=0.04, pad=0.02)
     plt.show()
 
@@ -93,19 +94,20 @@ def calc_B(psi, r, z, g=None):
     else:
         return B_r, B_z, np.zeros_lie(B_r)
 
-def plot_2D_vector(B_r, B_z, B_theta=None, r=None, z=None, step=10, mode='stream', title=None ):
-    if r is None or z is None:
+def plot_2D_vector(B_r, B_z, B_theta=None, r=None, z=None, step=5, mode='stream', title=None ):
+    if r is None or z is None: # if r, z is not provided, make it
         r = np.arange(B_z.shape[0])
         z = np.arange(B_r.shape[1])
-    
+
     # too many point is not good!
     r, z = r[::step], z[::step]
     B_r, B_z = B_r[::step, ::step], B_z[::step, ::step]
 
     B_r_T, B_z_T = B_r.T, B_z.T
 
-    fig, ax = plt.subplots()
-    if B_theta is None: # draw at rz plane 
+    
+    if B_theta is None: # draw at rz plane
+        fig, ax = plt.subplots() 
         if mode == 'stream':
             mag = np.hypot(B_r_T, B_z_T)
             sp = ax.streamplot(r, z, B_r_T, B_z_T, color=mag, density=1, broken_streamlines=False, linewidth=1)
@@ -117,7 +119,14 @@ def plot_2D_vector(B_r, B_z, B_theta=None, r=None, z=None, step=10, mode='stream
             q = ax.quiver(X, Y, B_r_T, B_z_T, np.hypot(B_r_T, B_z_T), pivot='mid')
             fig.colorbar(q, ax=ax, label='|B|')
     else:
-        pass # 3D plot is not supported for now
+        ax = plt.figure().add_subplot(projection='3d')
+
+        X, Y, Z = np.meshgrid(r, z, 0)
+        B_theta_T = B_theta[::step, ::step].T
+        B_r_T, B_z_T, B_theta_T = np.expand_dims(B_r_T, axis=-1), np.expand_dims(B_z_T, axis=-1), np.expand_dims(B_theta_T, axis=-1)
+        print(B_r.shape)
+        print(X.shape)
+        ax.quiver(X, Y, Z, B_r_T, B_z_T, B_theta_T, length=0.05, normalize=True)
 
     ax.set_aspect('equal'); ax.set_xlabel('r'); ax.set_ylabel('z')
     if title: ax.set_title(title)
@@ -128,5 +137,6 @@ if __name__ == "__main__":
     g = calc_g(psi, type=type, b=b, R=R, c=0)
     B_r, B_z, B_theta = calc_B(psi=psi, r=r, z=z, g=g)
     # plot2D(psi, r, z, title='psi')
-    plots2D([B_r, B_z, B_theta], r=r, z=z, titles=['B_r', 'B_z', 'B_theta'])
-    plot_2D_vector(B_r, B_z, r=r, z=z, mode='qiuver')
+    # plots2D([B_r, B_z, B_theta], r=r, z=z, titles=['B_r', 'B_z', 'B_theta'])
+    # plot_2D_vector(B_r, B_z, r=r, z=z, mode='qiuver')
+    plot_2D_vector(B_r, B_z, B_theta=B_theta, r=r, z=z, mode='qiuver')
