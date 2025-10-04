@@ -1,8 +1,11 @@
 import netCDF4 as nc
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 
-ds = nc.Dataset('result.nc', "r")
+# ds = nc.Dataset('result.nc', "r")
+ds = nc.Dataset('polynomial.nc', "r")
+print(ds)
 
 # Let's calculate B_z, B_r
 # B_theta is a little treaky.
@@ -15,8 +18,41 @@ psi = ds.variables['psi'][:] # axis=0 is z. axis=1 is r
 r = ds.variables['r'][:]
 z = ds.variables['z'][:]    
 
+R = ds.getncattr("R")
+a = ds.getncattr("a")
+b = ds.getncattr("b")
+n = int( ds.getncattr("n") )
+m = int( ds.getncattr("m") )
+type = ds.getncattr("type")
+beta0 = ds.getncattr("beta0")
+mu0 = 4 * np.pi * 1e-7
 print(psi.shape)
 
+"""
+for solov'ev solution, gg_prime = - b * R**2 (constant)
+So we can determine g:
+g(psi) = sqrt(c - 2 * b * R**2 * psi)
+where c is integral constant
+
+for polynomial solution, gg_prime = A * (1-psi**m)**n
+where A = (1-beta0)*mu0*R
+general solution for g is
+sqrt[ 2A*sum_(k=0)^n{ binom(n, k) * (-1)^k / (1+mr) * psi^(mr+1) } + C]
+where C is arbitrary constant
+
+TODO: How to determine constant c?
+"""
+
+def calc_g(psi, type, b, R, c):
+    if type == "solovev":
+        return np.sqrt(c - 2*b*R**2 * psi)
+    elif type == "polynomial":
+        g = np.zeros_like(psi)
+        for k in range(n):
+            g += math.comb(n, k) * (-1)**k / (1 + m*k) * psi**(m*k+1)
+        A = 2*(1-beta0) * mu0 * R
+        return np.sqrt( A * g + c)
+    
 def plot2D(f, r=None, z=None, title=None):
     fig, ax = plt.subplots()
     if r is None or z is None:
@@ -44,16 +80,20 @@ def plots2D(fs, r=None, z=None, titles=None):
     fig.colorbar(plot, ax=axes, fraction=0.04, pad=0.02)
     plt.show()
 
-def calc_B(psi, r, z):
+def calc_B(psi, r, z, g=None):
     dpdz = np.gradient(psi, z, axis=1)
     dpdr = np.gradient(psi, r, axis=0)
 
     R, Z = np.meshgrid(r, z, indexing='ij')
     B_r = - 1/R * dpdz
     B_z = + 1/R * dpdr
-    return B_r, B_z
+    if g is not None:
+        B_theta = 1/R * g
+        return B_r, B_z, B_theta
+    else:
+        return B_r, B_z, np.zeros_lie(B_r)
 
-def plot_B(B_r, B_z, B_theta=None, r=None, z=None, step=10, mode='stream', title=None ):
+def plot_2D_vector(B_r, B_z, B_theta=None, r=None, z=None, step=10, mode='stream', title=None ):
     if r is None or z is None:
         r = np.arange(B_z.shape[0])
         z = np.arange(B_r.shape[1])
@@ -85,8 +125,8 @@ def plot_B(B_r, B_z, B_theta=None, r=None, z=None, step=10, mode='stream', title
     return fig, ax
 
 if __name__ == "__main__":
-    B_r, B_z = calc_B(psi, r, z)
+    g = calc_g(psi, type=type, b=b, R=R, c=0)
+    B_r, B_z, B_theta = calc_B(psi=psi, r=r, z=z, g=g)
     # plot2D(psi, r, z, title='psi')
-    # plots2D([B_r, B_z], r=r, z=z, titles=['B_r', 'B_z'])
-    print(r.shape)
-    plot_B(B_r, B_z, r=r, z=z, mode='qiuver')
+    plots2D([B_r, B_z, B_theta], r=r, z=z, titles=['B_r', 'B_z', 'B_theta'])
+    plot_2D_vector(B_r, B_z, r=r, z=z, mode='qiuver')

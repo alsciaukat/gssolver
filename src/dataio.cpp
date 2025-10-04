@@ -61,6 +61,13 @@ int store_netcdf(Field<double> &psi, Field<double> &F, const double &sigma,
   J_phi_v.putVar(J_phi.data());
   B_r_v.putVar(B_r.data());
   B_z_v.putVar(B_z.data());
+  file.putAtt("R", ncDouble, 1, &param.R);
+  file.putAtt("a", ncDouble, 1, &param.a);
+  file.putAtt("b", ncDouble, 1, &param.b);
+  file.putAtt("n", ncDouble, 1, &param.n);
+  file.putAtt("m", ncDouble, 1, &param.m);
+  file.putAtt("beta0", ncDouble, 1, &param.beta0);
+  file.putAtt("type", param.ictype);
   return EXIT_SUCCESS;
 }
 
