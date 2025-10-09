@@ -55,30 +55,68 @@ def show_field(R, Z, field, title: str):
 
 
 def plot_solovev():
-    n = int(sys.argv[1])
     file = nc.Dataset("solovev.nc", "r")
     h = file.variables["h"][:]
     N = file.variables["N"][:]
     max_error = file.variables["max_error"][:]
     l2_error = file.variables["l2_error"][:]
     time2run = file.variables["time2run"][:]
+
+    n = int(sys.argv[1])
     psi = file.variables[f"psi{n}"][:]
     psi_t = file.variables[f"psi_t{n}"][:]
     r = file.variables[f"r{n}"][:]
     z = file.variables[f"z{n}"][:]
     R, Z = np.meshgrid(r, z, indexing="ij")
-    # plt.loglog(h, l2_error)
-    plt.plot(N, time2run)
-    plt.show()
+    compare(psi, psi_t, R, Z)
+
+    # logh = np.log10(h)
+    # loge = np.log10(l2_error)
+
+    # coeffs = np.polyfit(logh, loge, 1)
+    # b = coeffs[0]
+    # a = 10 ** coeffs[1]
+    # e_fit = a * h ** 3
+
+    # plt.loglog(h, l2_error, "o")
+    # plt.loglog(h, e_fit, "-")
+
+    # print(f"Fitted Exponent: {b}")
+    # plt.plot(N, time2run)
+    # plt.show()
 
 
 def plot_iter_error():
-    file = nc.Dataset("polynomial.nc", "r")
+    file = nc.Dataset("test.nc", "r")
     max_errors = file.variables["max_error"][:]
     l2_errors = file.variables["l2_error"][:]
     plt.plot(l2_errors)
     plt.yscale('log')
-    plt.ylim(top=1)
+    plt.show()
+
+
+def debug():
+    file = nc.Dataset("test.nc", "r")
+    file2 = nc.Dataset("solovev.nc", "r")
+    n = int(sys.argv[1])
+    psi = file.variables[f"psi{n}"][:]
+    psi_t = file2.variables["psi_t1"][:]
+    r = file.variables[f"r{n}"][:]
+    z = file.variables[f"z{n}"][:]
+    r2 = file2.variables["r1"][:]
+    z2 = file2.variables["z1"][:]
+    R, Z = np.meshgrid(r, z, indexing="ij")
+    R2, Z2 = np.meshgrid(r2, z2, indexing="ij")
+    fig, axes = plt.subplots(1, 1, figsize=(10, 6))
+    overlay = axes.contourf(R2, Z2, psi_t, levels=np.linspace(0, 0.11, 11),
+                            cmap='viridis', alpha=0.5)
+    contours = axes.contour(R, Z, psi, levels=np.linspace(0, 1, 11),
+                            cmap='plasma')
+    axes.set(xlabel="r", ylabel="z")
+    axes.axis("equal")
+
+    plt.clabel(contours, inline=True)
+    plt.colorbar(overlay)
     plt.show()
 
 
@@ -93,3 +131,4 @@ if __name__ == "__main__":
     # compare_solovev(psi, psi_t, R, Z)
     plot_iter_error()
     # plot_solovev()
+    # debug()

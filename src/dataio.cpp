@@ -86,7 +86,7 @@ int store_field(NcFile &file, Field<double> &field, const std::string vname,
   return EXIT_SUCCESS;
 }
 
-int store_vector(netCDF::NcFile &file, std::vector<double> &vector,
+int store_vector(netCDF::NcFile &file, const std::vector<double> &vector,
                  const std::string vname, const size_t size,
                  const std::string axname) {
   NcDim dim = file.getDim(axname);

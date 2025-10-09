@@ -25,6 +25,7 @@ struct BoundaryInfo {
 };
 
 struct Parameters {
+  std::string select;
   std::string gtype;
   int N;
   double R, a, b, c0, k, tolerance;

@@ -293,7 +293,7 @@ double get_l2_error(Field<double> &a, Field<double> &b) {
     for (int j = 0; j < N_z; j++) {
 	  if (grid.boundary[i][j].domain != Domain::INT)
 		continue;
-	  error_sq_sum += std::abs((a[i, j] - b[i, j]) / a[i, j]);
+	  error_sq_sum += std::pow((a[i, j] - b[i, j]), 2) * grid.h * grid.h;
     }
   }
   return std::sqrt(error_sq_sum);
@@ -312,6 +312,7 @@ void print_array(const Array<double> &a) {
 
 int initialize(Parameters &param) {
   toml::table config = toml::parse_file("config.toml");
+  param.select = config["select"].value<std::string>().value_or("default");
   SET(grid, type, std::string, gtype, "solovev")
   SET(grid, N, int, N, 11)
   SET(grid, R, double, R, 1.8)
@@ -354,7 +355,53 @@ get_initial_condition(const Parameters &param) {
   return std::make_unique<SolovevCondition>(param);
 }
 
-void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond, std::vector<double> &max_errors, std::vector<double> &l2_errors) {
+void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond) {
+  // initializations
+  update_F(F, psi, cond, param);
+  update_sigma(sigma, F, param);
+
+  int n_fix = 0;
+  Field<double> psi_p(grid, param, 1);
+
+  double max_error;  
+  double l2_error;
+
+  do {
+	// The Grad-Shafranov can be rewritten:
+	//     Δ*ψ = σ F(ψ)
+	// where Δ* is the elliptic toroidal operator that is
+	// simply equivalent to the left-hand side of Grad-Shafranov equation.
+	//
+	// Two nested iteration is used to solve this:
+	// outer iteration is a fixed-point iteration where the right-hand side
+	// is evaluated by ψ⁽ⁿ⁾ and the equation is solved to obtain ψ⁽ⁿ⁺¹⁾.
+	//     Δ*ψ = σ F(ψ⁽ⁿ⁾)
+	// This elliptic partial differential equation is then solved using
+	// the inner iteration called succesive over relaxation (SOR) method.
+	//
+	// ψ stays normalized between 0 and 1, with the aid of
+	// appropriate scaling by σ which is calculated such that the toroidal
+	// current I_p is kept constant.
+	// See /Accurate calculation of the gradients of the equilibrium poloidal
+	// flux in tokamaks/ by M. Woo, G. Jo, B. H. Park, A. Y. Aydemir, J. H. Kim.
+	n_fix++;
+	std::cout << "\nFixed-point Iteration: " << n_fix << "\n";
+
+    psi_p = psi;
+    std::cout << "Sigma: " << sigma << "\n";
+
+    sor(psi, F, sigma, param);
+	normalize(psi, param);
+
+    update_F(F, psi, cond, param);
+    update_sigma(sigma, F, param);
+	// max_error = get_max_error(psi, psi_p);
+	l2_error = get_l2_error(psi, psi_p);
+    std::cout << "L2 Error: " << l2_error << "\n";        
+  } while (l2_error > param.e_fix);
+}
+
+void solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond, std::vector<double> &max_errors, std::vector<double> &l2_errors, netCDF::NcFile &file) {
   if (max_errors.size() > 0 || l2_errors.size() > 0) throw std::invalid_argument("The output arguments `max_errors` and `l2_errors` must be empty");
   // initializations
   update_F(F, psi, cond, param);
@@ -390,17 +437,22 @@ void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi
     std::cout << "Sigma: " << sigma << "\n";
 
     sor(psi, F, sigma, param);
-	if (param.ictype != "solovev") normalize(psi, param);
+	normalize(psi, param);
 
     update_F(F, psi, cond, param);
     update_sigma(sigma, F, param);
 	max_error = get_max_error(psi, psi_p);
 	l2_error = get_l2_error(psi, psi_p);
 	max_errors.push_back(max_error);
-	l2_errors.push_back(l2_error);
+	l2_errors.push_back(l2_error);        
 
-    std::cout << "Error: " << max_error << "\n";        
-  } while (max_error > param.e_fix);
+    std::string i_str = std::to_string(n_fix);
+    store_field(file, psi, "psi" + i_str, {"r" + i_str, "z" + i_str});
+    store_vector(file, grid.r, "r" + i_str, grid.N_r, "r" + i_str);
+    store_vector(file, grid.z, "z" + i_str, grid.N_z, "z" + i_str);
+    store_field(file, F, "F" + i_str, {"r" + i_str, "z" + i_str});
+    std::cout << "L2 Error: " << l2_error << "\n";        
+  } while (l2_error > param.e_fix);
 }
 
 void store_default(netCDF::NcFile &file, const Parameters &param, Field<double> &psi, Field<double> &F, double &sigma) {
@@ -477,7 +529,7 @@ void run_solovev(Parameters &param) {
           continue;
         double error_tmp =
             std::abs((psi[i, j] - psi_solovev[i, j]) / psi[i, j]);
-        error_sq_cum += error_tmp * error_tmp;
+        error_sq_cum += std::pow(psi[i, j] - psi_solovev[i, j], 2) * grid.h * grid.h;
         if (error_tmp > error_max)
           error_max = error_tmp;
       }
@@ -511,7 +563,7 @@ void run_polynomial(Parameters &param) {
   std::vector<double> max_errors;
   std::vector<double> l2_errors;
 
-  solve_default(param, grid, psi, F, sigma, *cond, max_errors, l2_errors);
+  solve_polynomial(param, grid, psi, F, sigma, *cond, max_errors, l2_errors, file);
 
   store_field(file, psi, "psi", {"r", "z"});
   store_field(file, F, "F", {"r", "z"});
@@ -522,10 +574,25 @@ void run_polynomial(Parameters &param) {
 }
 
 int main() {
-  std::cout << std::fixed << std::setprecision(6);
+  std::cout << std::fixed << std::setprecision(15);
   Parameters param;
   initialize(param);
-  if (param.ictype == "solovev") run_solovev(param); 
-  else if (param.ictype == "polynomial") run_polynomial(param); 
+  if (param.select == "solovev") {
+    run_solovev(param);
+  } else if (param.select == "polynomial") {
+    run_polynomial(param);
+  } else {
+	double sigma = 1;
+	auto cond = get_initial_condition(param);
+	Grid grid(param);
+	netCDF::NcFile file(param.ofname, netCDF::NcFile::replace);
+
+    Field<double> psi(grid, param, 0.11);
+    Field<double> F(grid, param, 0);
+    std::vector<double> max_errors;
+    std::vector<double> l2_errors;
+
+    solve_polynomial(param, grid, psi, F, sigma, *cond, max_errors, l2_errors, file);
+  }
   return EXIT_SUCCESS;
 }

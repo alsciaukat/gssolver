@@ -12,7 +12,7 @@ int store_netcdf(netCDF::NcFile &file, Field<double>& psi, Field<double> &F, con
 int store_field(netCDF::NcFile &file, Field<double> &field,
 				const std::string vname,
 				const std::vector<std::string> axnames);
-int store_vector(netCDF::NcFile &file, std::vector<double> &vector,
+int store_vector(netCDF::NcFile &file, const std::vector<double> &vector,
 				 const std::string vname, const size_t size, const std::string axname);
 
 #endif
