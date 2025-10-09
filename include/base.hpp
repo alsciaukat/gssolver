@@ -33,6 +33,9 @@ struct Parameters {
   double psi_l;
   std::string ofname;
   std::string offormat;
+  int N_gr;
+  double logh_low;
+  double delta_logh;
   std::string ictype;
   bool print;
   double beta0, m, n;
@@ -50,6 +53,8 @@ public:
   Array<BoundaryInfo> boundary;
 
   Grid(const Parameters &param);
+
+  double solovev(double r, double z) const;  
 };
 
 template<typename T>

@@ -1,16 +1,18 @@
 #include "dataio.hpp"
 #include "base.hpp"
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <ranges>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 using namespace netCDF;
 
-int store_netcdf(Field<double> &psi, Field<double> &F, const double &sigma,
-				 const InitialCondition &cond, const Parameters &param) {
+int store_netcdf(NcFile &file, Field<double> &psi, Field<double> &F,
+				 const double &sigma, const Parameters &param) {
   const Grid &grid = psi.grid;
   const std::vector<double> &r = grid.r;
   const std::vector<double> &z = grid.z;
@@ -38,7 +40,6 @@ int store_netcdf(Field<double> &psi, Field<double> &F, const double &sigma,
 	psi_f.push_back(x);
   for (double x : F.value | std::views::join)
 	F_f.push_back(x);
-  NcFile file(param.ofname, NcFile::replace);
   NcDim rDim = file.addDim("r", N_r);
   NcDim rpDim = file.addDim("rp", N_r-1);
   NcDim zDim = file.addDim("z", N_z);
@@ -63,6 +64,37 @@ int store_netcdf(Field<double> &psi, Field<double> &F, const double &sigma,
   B_z_v.putVar(B_z.data());
   return EXIT_SUCCESS;
 }
+
+int store_field(NcFile &file, Field<double> &field, const std::string vname,
+                const std::vector<std::string> axnames) {
+
+  const Grid &grid = field.grid;
+  std::vector<double> field_f;
+  for (double x : field.value | std::views::join)
+	field_f.push_back(x);
+  if (axnames.size() < 2) throw std::invalid_argument("At least two axes names must be provided by `axnames`.");
+  NcDim ax1Dim;
+  NcDim ax2Dim;
+  NcVar field_v;
+  ax1Dim = file.getDim(axnames[0]);
+  if (ax1Dim.isNull()) ax1Dim = file.addDim(axnames[0], grid.N_r);
+  ax2Dim = file.getDim(axnames[1]);
+  if (ax2Dim.isNull()) ax2Dim = file.addDim(axnames[1], grid.N_z);
+  std::vector<NcDim> dims = {ax1Dim, ax2Dim};
+  field_v = file.addVar(vname, ncDouble, dims);
+  field_v.putVar(field_f.data());
+  return EXIT_SUCCESS;
+}
+
+int store_vector(netCDF::NcFile &file, std::vector<double> &vector,
+                 const std::string vname, const size_t size,
+                 const std::string axname) {
+  NcDim dim = file.getDim(axname);
+  if (dim.isNull()) dim = file.addDim(axname, size);
+  NcVar vector_v = file.addVar(vname, ncDouble, dim);
+  vector_v.putVar(vector.data());
+  return EXIT_SUCCESS;
+};
 
 int store_csv(const Field<double> &field, const std::string &fname) {
   std::ofstream file(fname);

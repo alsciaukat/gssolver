@@ -28,6 +28,8 @@ Grid::Grid(const Parameters &param)
 
   if (c0 > a || -b > c0)
     throw std::invalid_argument("Invalid parameters: a, b, c0");
+  if (param.N < 2)
+    throw std::invalid_argument("Size too small: N");
 
   // analytically find the bounding box of the boundary.
   r_max = std::sqrt(R * R + std::sqrt(8 * k / (a - c0)));
@@ -113,10 +115,10 @@ Grid::Grid(const Parameters &param)
   }
 }
 
-// double Grid::solovev(double r, double z) const {
-//   return 0.5 * (b + c0) * R * R * z * z + 0.5 * c0 * (r * r - R * R) * z * z +
-//          (a - c0) * std::pow(r * r - R * R, 2) / 8;
-// }
+double Grid::solovev(double r, double z) const {
+  return 0.5 * (b + c0) * R * R * z * z + 0.5 * c0 * (r * r - R * R) * z * z +
+         (a - c0) * std::pow(r * r - R * R, 2) / 8;
+}
 
 template class Field<double>;
 

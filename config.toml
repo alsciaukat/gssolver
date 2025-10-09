@@ -9,7 +9,7 @@
 type = "solovev"
 
 # The number of points in the r direction
-N = 100
+N = 200
 
 
 # The default format is chosen automatically
@@ -23,6 +23,10 @@ N = 100
 name = "polynomial.nc"
 print = false
 
+N_gr = 17
+logh_low = -2.4
+delta_logh = 0.1
+
 [solver] 
 
 # relative error for the fixed-point iteration
@@ -31,7 +35,7 @@ e_fix = 1e-6
 # relative error for Succesive Over Relaxation
 e_sor = 1e-8
 # relaxation coefficient. Diverges if ≥ 2.
-omega = 1.8
+omega = 1.9
 
 # relative error for the minimum at the normalization step
 e_min = 1e-6
@@ -50,7 +54,7 @@ psi_bdry = 0.1
 # Choose p(psi) and g(psi)
 # "solovev" and "polynomial" are supported.
 type = "polynomial"
-beta0 = 0.1
+beta0 = 0.5
 m = 2
 n = 1
 
