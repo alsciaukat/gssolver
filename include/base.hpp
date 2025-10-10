@@ -43,6 +43,21 @@ struct Parameters {
   double A;
 };
 
+class Vector {
+public:
+  double r;
+  double phi;
+  double z;
+
+  Vector(double r, double phi, double z);
+
+  Vector operator+(const Vector &v) const;
+  Vector operator-(const Vector &v) const;
+  Vector operator*(const double a) const;
+  Vector operator/(const double a) const;
+  friend Vector operator*(double a, const Vector &v);
+};  
+
 class Grid {
 public:
   double R, a, b, c0, k;
@@ -68,9 +83,11 @@ public:
 
   T &operator[](std::size_t i, std::size_t j);
   Field<T> &operator=(const Field<T> &other);
-  double interpolate_z(int i, int j, double zz) const;
-  double interpolate_r(int i, int j, double rr) const;
+  T interpolate_z(int i, int j, double zz) const;
+  T interpolate_r(int i, int j, double rr) const;
 };
+
+template class Field<Vector>;
 
 class InitialCondition {
 public:

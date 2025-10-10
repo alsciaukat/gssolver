@@ -358,7 +358,7 @@ get_initial_condition(const Parameters &param) {
 void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond) {
   // initializations
   update_F(F, psi, cond, param);
-  update_sigma(sigma, F, param);
+  if (param.ictype != "solovev") update_sigma(sigma, F, param);
 
   int n_fix = 0;
   Field<double> psi_p(grid, param, 1);
@@ -391,10 +391,10 @@ void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi
     std::cout << "Sigma: " << sigma << "\n";
 
     sor(psi, F, sigma, param);
-	normalize(psi, param);
+	if (param.ictype != "solovev") normalize(psi, param);
 
     update_F(F, psi, cond, param);
-    update_sigma(sigma, F, param);
+    if (param.ictype != "solovev") update_sigma(sigma, F, param);
 	// max_error = get_max_error(psi, psi_p);
 	l2_error = get_l2_error(psi, psi_p);
     std::cout << "L2 Error: " << l2_error << "\n";        
@@ -581,7 +581,7 @@ int main() {
     run_solovev(param);
   } else if (param.select == "polynomial") {
     run_polynomial(param);
-  } else {
+  } else if (param.select == "blender") {
 	double sigma = 1;
 	auto cond = get_initial_condition(param);
 	Grid grid(param);
@@ -589,10 +589,43 @@ int main() {
 
     Field<double> psi(grid, param, 0.11);
     Field<double> F(grid, param, 0);
-    std::vector<double> max_errors;
-    std::vector<double> l2_errors;
+    solve_default(param, grid, psi, F, sigma, *cond);
 
-    solve_polynomial(param, grid, psi, F, sigma, *cond, max_errors, l2_errors, file);
+    // Field<Vector> J(grid, param, {0, 0, 0});
+    // Field<Vector> B(grid, param, {0, 0, 0});
+	Field<double> J_r(grid, param, 0);
+	Field<double> J_phi(grid, param, 0);
+	Field<double> J_z(grid, param, 0);
+	Field<double> B_r(grid, param, 0);
+	Field<double> B_phi(grid, param, 0);
+	Field<double> B_z(grid, param, 0);
+
+	for (int i = 0; i < grid.N_r; i++) {
+      for (int j = 0; j < grid.N_z; j++) {
+		if (grid.boundary[i][j].domain != Domain::INT) continue;
+        J_phi[i, j] = -F[i, j] / (grid.r[i] * mu0 * std::sqrt(std::abs(sigma)));
+        B_phi[i, j] =
+            std::sqrt(grid.b * grid.R * grid.R * (1 - psi[i, j])) / grid.r[i];
+        double phi_r = (psi[i + 1, j] - psi[i - 1, j]) / (2 * grid.h);
+        double phi_z = (psi[i, j + 1] - psi[i, j - 1]) / (2 * grid.h);
+		B_r[i, j] = - phi_z / grid.r[i];
+		B_z[i, j] = phi_r / grid.r[i];
+		J_r[i, j] = - grid.b * grid.R * grid.R * phi_r / (2* grid.r[i] * std::sqrt(grid.b * grid.R * grid.R * (1 - psi[i, j])));
+		J_z[i, j] = grid.b * grid.R * grid.R * phi_z / (2* grid.r[i] * std::sqrt(grid.b * grid.R * grid.R * (1 - psi[i, j])));
+      }
+    }
+	store_field(file, psi, "psi", {"r", "z"});
+	store_field(file, F, "F", {"r", "z"});
+	store_field(file, J_r, "J_r", {"r", "z"});
+	store_field(file, J_phi, "J_phi", {"r", "z"});
+	store_field(file, J_z, "J_z", {"r", "z"});
+	store_field(file, B_r, "B_r", {"r", "z"});
+	store_field(file, B_phi, "B_phi", {"r", "z"});
+	store_field(file, B_z, "B_z", {"r", "z"});
+	store_vector(file, grid.r, "r", grid.N_r, "r");
+	store_vector(file, grid.z, "z", grid.N_z, "z");
+  } else {
+    std::cerr << "Nothing selected." << std::endl;
   }
   return EXIT_SUCCESS;
 }

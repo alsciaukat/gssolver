@@ -3,7 +3,7 @@
 # Look at the function `initialize` in `solver.cpp` for the default values. #
 #############################################################################
 
-select = "polynomial"
+select = "blender"
 
 [grid]
 
@@ -11,7 +11,7 @@ select = "polynomial"
 type = "solovev"
 
 # The number of points in the r direction
-N = 50
+N = 100
 
 
 # The default format is chosen automatically
@@ -22,7 +22,7 @@ N = 50
 # The case does not matter.
 # format = "netCDF"
 
-name = "test.nc"
+name = "output.nc"
 print = false
 
 N_gr = 17
@@ -32,18 +32,18 @@ delta_logh = 0.1
 [solver] 
 
 # relative error for the fixed-point iteration
-e_fix = 1e-13
+e_fix = 1e-8
 
 # relative error for Succesive Over Relaxation
 # it suddenly takes very long if e_sor < 1e-14
-e_sor = 1e-14
+e_sor = 1e-9
 
 # relaxation coefficient. Diverges if ≥ 2.
 # fast but imprecise if close to 2, slow but precise close to 1
 omega = 1.5
 
 # relative error for the minimum at the normalization step
-e_min = 1e-14
+e_min = 1e-9
 
 # The total current
 I_p = 500e3
@@ -58,7 +58,7 @@ psi_bdry = 0.1
 
 # Choose p(psi) and g(psi)
 # "solovev" and "polynomial" are supported.
-type = "polynomial"
+type = "solovev"
 beta0 = 0.5
 m = 2
 n = 1

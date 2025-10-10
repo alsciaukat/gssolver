@@ -62,28 +62,31 @@ def plot_solovev():
     l2_error = file.variables["l2_error"][:]
     time2run = file.variables["time2run"][:]
 
-    n = int(sys.argv[1])
-    psi = file.variables[f"psi{n}"][:]
-    psi_t = file.variables[f"psi_t{n}"][:]
-    r = file.variables[f"r{n}"][:]
-    z = file.variables[f"z{n}"][:]
-    R, Z = np.meshgrid(r, z, indexing="ij")
-    compare(psi, psi_t, R, Z)
+    # n = int(sys.argv[1])
+    # psi = file.variables[f"psi{n}"][:]
+    # psi_t = file.variables[f"psi_t{n}"][:]
+    # r = file.variables[f"r{n}"][:]
+    # z = file.variables[f"z{n}"][:]
+    # R, Z = np.meshgrid(r, z, indexing="ij")
+    # compare(psi, psi_t, R, Z)
 
-    # logh = np.log10(h)
-    # loge = np.log10(l2_error)
+    logh = np.log10(h)
+    loge = np.log10(l2_error)
 
-    # coeffs = np.polyfit(logh, loge, 1)
-    # b = coeffs[0]
-    # a = 10 ** coeffs[1]
-    # e_fit = a * h ** 3
+    coeffs = np.polyfit(logh, loge, 1)
+    b = coeffs[0]
+    a = 10 ** coeffs[1]
+    e_fit = a * h ** 3
 
-    # plt.loglog(h, l2_error, "o")
-    # plt.loglog(h, e_fit, "-")
+    plt.loglog(h, l2_error, "o", label="Raw")
+    plt.loglog(h, e_fit, "-", label="Fitted")
+    plt.xlabel("h (Grid spacing)")
+    plt.ylabel("L2 Error")
+    plt.legend()
 
-    # print(f"Fitted Exponent: {b}")
+    print(f"Fitted Exponent: {b}")
     # plt.plot(N, time2run)
-    # plt.show()
+    plt.show()
 
 
 def plot_iter_error():
@@ -91,6 +94,8 @@ def plot_iter_error():
     max_errors = file.variables["max_error"][:]
     l2_errors = file.variables["l2_error"][:]
     plt.plot(l2_errors)
+    plt.xlabel("# Iteration")
+    plt.ylabel("L2 Error (from previous)")
     plt.yscale('log')
     plt.show()
 
@@ -119,6 +124,20 @@ def debug():
     plt.colorbar(overlay)
     plt.show()
 
+def plot_output():
+    file = nc.Dataset("output.nc", "r")
+    J_phi = file.variables["J_phi"][:]
+    B_r = file.variables["B_r"][:]
+    J_r = file.variables["J_r"][:]
+    J_z = file.variables["J_z"][:]
+    r = file.variables["r"][:]
+    z = file.variables["z"][:]
+    R, Z = np.meshgrid(r, z, indexing="ij")
+    overlay = plt.contourf(R, Z, J_z, levels=100, cmap='viridis', alpha=0.5)
+    plt.colorbar(overlay)
+    plt.show()
+
+
 
 if __name__ == "__main__":
     # compare_solovev(psi_solovev, psi_theory, R_solovev, Z_solovev)
@@ -132,3 +151,6 @@ if __name__ == "__main__":
     plot_iter_error()
     # plot_solovev()
     # debug()
+    # plot_output()
+    # file = nc.Dataset("l2_error.nc", "r")
+    # print(file.variables)

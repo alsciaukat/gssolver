@@ -5,6 +5,28 @@
 
 const double mu0 = 4 * std::numbers::pi * 1e-7;
 
+Vector::Vector(double r, double phi, double z) : r(r), phi(phi), z(z) {}
+
+Vector Vector::operator+(const Vector &v) const {
+  return Vector(r + v.r, phi + v.phi, z + v.z);
+}
+
+Vector Vector::operator-(const Vector &v) const {
+  return Vector(r - v.r, phi - v.phi, z - v.z);
+}  
+
+Vector Vector::operator*(const double a) const {
+  return Vector(a * r, a * phi, a * z);
+}
+
+Vector operator*(double a, const Vector &v) {
+  return Vector(a * v.r, a * v.phi, a * v.z);
+}  
+
+Vector Vector::operator/(const double a) const {
+  return Vector(r / a, phi / a, z / a);
+}
+
 Grid::Grid(const Parameters &param)
 	: R(param.R), a(param.a), b(param.b), c0(param.c0), k(param.k),
 	  tolerance(param.tolerance) {
@@ -125,7 +147,7 @@ template class Field<double>;
 
 // interpolation is done using the second order Newton polynomials
 template <typename T>
-double Field<T>::interpolate_z(int i, int j, double zz) const {
+T Field<T>::interpolate_z(int i, int j, double zz) const {
   const std::vector<double> &z = grid.z;
   const std::vector<double> &r = grid.r;
   const double h = grid.h;
@@ -135,7 +157,7 @@ double Field<T>::interpolate_z(int i, int j, double zz) const {
 }
 
 template <typename T>
-double Field<T>::interpolate_r(int i, int j, double rr) const {
+T Field<T>::interpolate_r(int i, int j, double rr) const {
   const std::vector<double> &z = grid.z;
   const std::vector<double> &r = grid.r;
   const double h = grid.h;
