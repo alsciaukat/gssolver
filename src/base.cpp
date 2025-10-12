@@ -194,10 +194,17 @@ double SolovevCondition::gg_prime(double psi) {
   return - param.b * param.R * param.R;
 }
 
+// H-mode p_prime
+const double d = 0.02;
+const double betaH = 0.6;
+const double p_prime0 = 0.18;
+const double psi0 = 0.95;
+
 double PolynomialCondition::p_prime(double psi) {
-  return param.beta0 * std::pow(1 - std::pow(psi, param.m), param.n) / param.R;
+  return ( betaH * std::pow(1 - std::pow(psi, param.m), param.n) + p_prime0) * 1/2 * (std::tanh( (psi0 - psi / d) ) + 1) / param.R;
 }  
 
+
 double PolynomialCondition::gg_prime(double psi) {
-  return (1 - param.beta0) * mu0 * param.R * std::pow(1 - std::pow(psi, param.m), param.n);
+  return mu0 * param.R * ( std::pow(1 - std::pow(psi, param.m), param.n) - ( betaH * std::pow(1 - std::pow(psi, param.m), param.n) + p_prime0) * 1/2 * (std::tanh( (psi0 - psi / d) ) + 1) );
 }  
