@@ -125,17 +125,34 @@ def debug():
     plt.show()
 
 def plot_output():
-    file = nc.Dataset("output.nc", "r")
+    file = nc.Dataset("hmode_output.nc", "r")
     J_phi = file.variables["J_phi"][:]
-    B_r = file.variables["B_r"][:]
     J_r = file.variables["J_r"][:]
     J_z = file.variables["J_z"][:]
+    B_phi = file.variables["B_phi"][:]
+    B_r = file.variables["B_r"][:]
+    B_z = file.variables["B_z"][:]
+    r = file.variables["r"][:]
+    z = file.variables["z"][:]
+    psi_v = file.variables["psi_v"][:]
+    p_prime = file.variables["p_prime"][:]
+    gg_prime = file.variables["gg_prime"][:]
+    R, Z = np.meshgrid(r, z, indexing="ij")
+    overlay = plt.contourf(R, Z, B_z, levels=100, cmap='viridis', alpha=0.5)
+    plt.plot(psi_v, gg_prime)
+
+
+def extrct_plots():
+    file = nc.Dataset("hmode_output.nc", "r")
+    prefix = "hmode"
     r = file.variables["r"][:]
     z = file.variables["z"][:]
     R, Z = np.meshgrid(r, z, indexing="ij")
-    overlay = plt.contourf(R, Z, J_z, levels=100, cmap='viridis', alpha=0.5)
-    plt.colorbar(overlay)
-    plt.show()
+    for name in ["J_phi", "J_r", "J_z", "B_phi", "B_r", "B_z"]:
+        v = file.variables[name][:]
+        overlay = plt.contourf(R, Z, v, levels=100, cmap='viridis', alpha=0.5)
+        plt.colorbar(overlay)
+        plt.savefig(prefix + name + ".png")
 
 
 
@@ -148,9 +165,10 @@ if __name__ == "__main__":
     # show_field(Rrp_poly, Zrp_poly, B_z_poly, "B_z")
     # show_field(R_poly, Z_poly, J_phi_poly, "J_ϕ")
     # compare_solovev(psi, psi_t, R, Z)
-    plot_iter_error()
+    # plot_iter_error()
     # plot_solovev()
     # debug()
     # plot_output()
     # file = nc.Dataset("l2_error.nc", "r")
+    extrct_plots()
     # print(file.variables)

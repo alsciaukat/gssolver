@@ -34,6 +34,7 @@ struct Parameters {
   double psi_l;
   std::string ofname;
   std::string offormat;
+  bool verbose;
   int N_gr;
   double logh_low;
   double delta_logh;

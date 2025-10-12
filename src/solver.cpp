@@ -6,6 +6,7 @@
 #include <ranges>
 #include <string>
 #include <chrono>
+#include <utility>
 #include <toml++/toml.hpp>
 
 #include "base.hpp"
@@ -38,7 +39,7 @@ void update_sigma(double &sigma, Field<double> &F, const Parameters &param) {
   else sigma = param.I_p / (param.psi_bdry * I);
 }
 
-void normalize(Field<double> &psi, const Parameters &param) {
+std::pair<int , int> normalize(Field<double> &psi, const Parameters &param) {
   const Grid &grid = psi.grid;
   // normalize psi between 0 at the minimum and 1 at the boundary
   double psi_min = INFINITY;
@@ -104,7 +105,7 @@ void normalize(Field<double> &psi, const Parameters &param) {
     z_delta = z_min - z_min_p;
   } while (std::abs(r_delta / r_min) > param.e_min ||
            std::abs(z_delta / z_min) > param.e_min);
-  std::cout << "(r_min, z_min): (" << r_min << ", " << z_min << ")\n";
+  if (param.verbose) std::cout << "(r_min, z_min): (" << r_min << ", " << z_min << ")\n";
 
   double psi_min_p = psi_min;
   psi_min = psi.interpolate_z(i - 1, j, z_min) +
@@ -120,12 +121,13 @@ void normalize(Field<double> &psi, const Parameters &param) {
   if (psi_min_p < psi_min)
     std::cerr << "WARNING: Minimum is not accurate. Might cause problem.\n";
 
-  std::cout << "psi(r_min, z_min) = " << psi_min << "\n";
+  if (param.verbose) std::cout << "psi(r_min, z_min) = " << psi_min << "\n";
 
   // normalize ψ
   for (double &x : psi.value | std::views::join) {
     x = (x - psi_min) / (param.psi_l - psi_min) * param.psi_l;
   }
+  return {i, j};
 }
 
 void sor_old(Field<double> &psi, Field<double> &F,
@@ -334,7 +336,8 @@ int initialize(Parameters &param) {
   SET(output, format, std::string, offormat, "csv")
   SET(output, name, std::string, ofname, "result.csv")
 #endif
-  SET(output, print, bool, print, false)
+  SET(output, print_psi, bool, print, false)
+  SET(output, verbose, bool, verbose, false)
   SET(output, N_gr, int, N_gr, 17)
   SET(output, logh_low, double, logh_low, -2.4)
   SET(output, delta_logh, double, delta_logh, 0.1)
@@ -374,7 +377,7 @@ get_initial_condition(const Parameters &param) {
   return std::make_unique<SolovevCondition>(param);
 }
 
-void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond) {
+std::pair<int, int> solve_default(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond) {
   // initializations
   update_F(F, psi, cond, param);
   if (param.ictype != "solovev") update_sigma(sigma, F, param);
@@ -384,6 +387,7 @@ void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi
 
   double max_error;  
   double l2_error;
+  std::pair<int, int> min_index{grid.N_r/2, grid.N_z/2};
 
   do {
 	// The Grad-Shafranov can be rewritten:
@@ -404,23 +408,32 @@ void solve_default(const Parameters &param, const Grid &grid, Field<double> &psi
 	// See /Accurate calculation of the gradients of the equilibrium poloidal
 	// flux in tokamaks/ by M. Woo, G. Jo, B. H. Park, A. Y. Aydemir, J. H. Kim.
 	n_fix++;
-	std::cout << "\nFixed-point Iteration: " << n_fix << "\n";
+	if (param.verbose) {
+		std::cout << "\nFixed-point Iteration: " << n_fix << "\n";
+		std::cout << "Sigma: " << sigma << "\n";
+	}
 
     psi_p = psi;
-    std::cout << "Sigma: " << sigma << "\n";
 
     sor(psi, F, sigma, param);
-	if (param.ictype != "solovev") normalize(psi, param);
+    if (param.ictype != "solovev") {
+	  min_index = normalize(psi, param);
+	}
 
     update_F(F, psi, cond, param);
     if (param.ictype != "solovev") update_sigma(sigma, F, param);
 	// max_error = get_max_error(psi, psi_p);
 	l2_error = get_l2_error(psi, psi_p);
-    std::cout << "L2 Error: " << l2_error << "\n";        
+	if (param.verbose) {
+		std::cout << "L2 Error: " << l2_error << "\n";
+	} else {
+	  std::cout << "# iter: " << n_fix << "\t" << "L2 error: " << l2_error << "\r";
+	}          
   } while (l2_error > param.e_fix);
+  return min_index;
 }
 
-void solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond, std::vector<double> &max_errors, std::vector<double> &l2_errors, netCDF::NcFile &file) {
+std::pair<int, int> solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond, std::vector<double> &max_errors, std::vector<double> &l2_errors, netCDF::NcFile &file) {
   if (max_errors.size() > 0 || l2_errors.size() > 0) throw std::invalid_argument("The output arguments `max_errors` and `l2_errors` must be empty");
   // initializations
   update_F(F, psi, cond, param);
@@ -430,6 +443,7 @@ void solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &
   Field<double> psi_p(grid, param, 1);
   double max_error;
   double l2_error;
+  std::pair<int, int> min_index{grid.N_r/2, grid.N_z/2};
 
   do {
 	// The Grad-Shafranov can be rewritten:
@@ -456,7 +470,7 @@ void solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &
     std::cout << "Sigma: " << sigma << "\n";
 
     sor(psi, F, sigma, param);
-	normalize(psi, param);
+	min_index = normalize(psi, param);
 
     update_F(F, psi, cond, param);
     update_sigma(sigma, F, param);
@@ -472,6 +486,7 @@ void solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &
     store_field(file, F, "F" + i_str, {"r" + i_str, "z" + i_str});
     std::cout << "L2 Error: " << l2_error << "\n";        
   } while (l2_error > param.e_fix);
+  return min_index;
 }
 
 void store_default(netCDF::NcFile &file, const Parameters &param, Field<double> &psi, Field<double> &F, double &sigma) {
@@ -605,9 +620,9 @@ int main() {
 	Grid grid(param);
 	netCDF::NcFile file(param.ofname, netCDF::NcFile::replace);
 
-    Field<double> psi(grid, param, 0.11);
+    Field<double> psi(grid, param, 1);
     Field<double> F(grid, param, 0);
-    solve_default(param, grid, psi, F, sigma, *cond);
+	std::pair<int, int> min_index =  solve_default(param, grid, psi, F, sigma, *cond);
 
     // Field<Vector> J(grid, param, {0, 0, 0});
     // Field<Vector> B(grid, param, {0, 0, 0});
@@ -617,7 +632,15 @@ int main() {
 	Field<double> B_r(grid, param, 0);
 	Field<double> B_phi(grid, param, 0);
 	Field<double> B_z(grid, param, 0);
+	std::vector<double> psi_v(grid.N_r - min_index.first, 0);
+	std::vector<double> p_prime(grid.N_r - min_index.first, 0);
+	std::vector<double> gg_prime(grid.N_r - min_index.first, 0);
 
+	for (int i = 0; i < grid.N_r - min_index.first; i++) {
+	  psi_v[i] = psi[min_index.first + i, min_index.second];
+	  p_prime[i] = (*cond).p_prime(psi_v[i], grid.r[i]);
+	  gg_prime[i] = (*cond).gg_prime(psi_v[i], grid.r[i]);
+	}          
 	for (int i = 0; i < grid.N_r; i++) {
       for (int j = 0; j < grid.N_z; j++) {
 		if (grid.boundary[i][j].domain != Domain::INT) continue;
@@ -643,6 +666,9 @@ int main() {
 	store_vector(file, grid.r, "r", grid.N_r, "r");
 	store_vector(file, grid.z, "z", grid.N_z, "z");
 
+    store_vector(file, p_prime, "p_prime", p_prime.size(), "psi_v");        
+    store_vector(file, gg_prime, "gg_prime", gg_prime.size(), "psi_v");        
+    store_vector(file, psi_v, "psi_v", psi_v.size(), "psi_v");        
 	std::cout << "\nWrote the result to: " << param.ofname << std::endl;        
   } else {
     std::cerr << "Nothing selected." << std::endl;

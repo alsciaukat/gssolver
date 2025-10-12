@@ -11,7 +11,7 @@ select = "blender"
 type = "solovev"
 
 # The number of points in the r direction
-N = 20
+N = 100
 
 
 # The default format is chosen automatically
@@ -23,7 +23,8 @@ N = 20
 # format = "netCDF"
 
 name = "hmode_output.nc"
-print = false
+vebose = false
+print_psi = false
 
 N_gr = 17
 logh_low = -2.4
@@ -59,7 +60,7 @@ psi_bdry = 0.1
 
 # Choose p(psi) and g(psi)
 # "solovev", "polynomial", "HMode" are supported.
-type = "hmode"
+type = "HMode"
 beta0 = 0.5
 m = 2
 n = 1

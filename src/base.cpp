@@ -215,7 +215,7 @@ const double D = 0.036;
 const double j_bs0 = 0.4;
 
 double HModeCondition::p_prime(double psi, double r) {
-  return - ( betaH * std::pow(1 - std::pow(psi, param.m), param.n) + p_prime0) * 0.5*h * (std::tanh( (psi0 - psi) / d ) + 1) / param.R;
+  return - ( betaH * std::pow(1 - std::pow(psi, param.m), param.n) + p_prime0) * 0.5*h * (std::tanh( (psi0 - psi) / d ) + 1) / r;
 }  
 
 double HModeCondition::gg_prime(double psi, double r) {
