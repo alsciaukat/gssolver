@@ -3,8 +3,8 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-ds = nc.Dataset('hmode.nc', "r")
-ds_sol = nc.Dataset('output_solovev.nc', "r")
+ds = nc.Dataset('1232h.nc', "r")
+ds_sol = nc.Dataset('1233solov.nc', "r")
 ds_poly = nc.Dataset('output_polynomial.nc', "r")
 print(ds)
 
@@ -178,10 +178,11 @@ def plot_vector(B_r, B_z, B_theta=None, r=None, z=None, step=5, mode='stream', t
     return fig, ax
 
 if __name__ == "__main__":
-    g = calc_g(psi, type=type, b=b, R=R, c=0)
-    B_r, B_z, B_theta = calc_B(psi=psi, r=r, z=z, g=g)
-    plot2D(psi, r, z, title='psi')
+    # g = calc_g(psi, type=type, b=b, R=R, c=0)
+    # B_r, B_z, B_theta = calc_B(psi=psi, r=r, z=z, g=g)
     plots2D([J_phi, J_phi_sol, J_phi_poly], r=r, z=z, titles=['test', 'solovev', 'polynomial'])
+    plot2D(psi)
+    plot2D(J_phi-J_phi_poly)
     # plots2D([B_r, B_z, B_theta], r=r, z=z, titles=['B_r', 'B_z', 'B_theta'])
     # plot_vector(B_r, B_z, r=r, z=z, mode='qiuver')
     # plot_vector(B_r, B_z, B_theta=B_theta, r=r, z=z, mode='qiuver')
