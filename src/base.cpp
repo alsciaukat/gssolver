@@ -194,7 +194,10 @@ double SolovevCondition::gg_prime(double psi) {
   return - param.b * param.R * param.R;
 }
 
-// H-mode p_prime
+// H-mode p_prime, gg_prime
+// You can see plot of this profile and adjust parameters:
+// https://www.desmos.com/calculator/65uenvvx0u
+
 const double d = 0.02;
 const double betaH = 0.6;
 const double p_prime0 = 0.18;
