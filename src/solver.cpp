@@ -16,8 +16,8 @@ void update_F(Field<double> &F, Field<double> &psi, InitialCondition &cond, cons
   const std::vector<double> &r = grid.r;
   for (int i = 0; i < grid.N_r; i++) {
     for (int j = 0; j < grid.N_z; j++) {
-      F[i, j] = -(mu0 * r[i] * r[i] * cond.p_prime(psi[i, j]) +
-                  cond.gg_prime(psi[i, j])) + 1e-100;
+      F[i, j] = -(mu0 * r[i] * r[i] * cond.p_prime(psi[i, j], r[i]) +
+                  cond.gg_prime(psi[i, j], r[i])) + 1e-100;
     }
   }
 }
@@ -308,6 +308,12 @@ void print_array(const Array<double> &a) {
   }
 }
 
+std::string to_lower(std::string str) {
+  auto str_v = str | std::views::transform([](auto c){ return static_cast<char>(std::tolower(c)); });
+  std::string str_l(str_v.begin(), str_v.end());
+  return str_l;  
+}  
+
 #define SET(SEC, VAR, TYPE, IVAR, DEFAULT) param.IVAR = config[#SEC][#VAR].value<TYPE>().value_or(DEFAULT);
 
 int initialize(Parameters &param) {
@@ -351,7 +357,20 @@ get_initial_condition(const Parameters &param) {
   // *factory pattern*
   // this function returns a pointer to
   // a concrete class of `InitialCondition`.
-  if (param.ictype == "polynomial") return std::make_unique<PolynomialCondition>(param);
+  std::string ictype_l = to_lower(param.ictype);
+  if (ictype_l == "polynomial") {
+	std::cout << "Using Polynomial Profile" << std::endl;
+    return std::make_unique<PolynomialCondition>(param);
+  }
+  if (ictype_l == "hmode") {
+	std::cout << "Using H-Mode Profile" << std::endl;
+    return std::make_unique<HModeCondition>(param);
+  }    
+  if (ictype_l == "solovev") {
+	std::cout << "Using Solovev Profile" << std::endl;
+    return std::make_unique<HModeCondition>(param);
+  }    
+  std::cout << "Initial condition type not known. Defaulting to Solovev Condition." << std::endl;
   return std::make_unique<SolovevCondition>(param);
 }
 
@@ -457,8 +476,7 @@ void solve_polynomial(const Parameters &param, const Grid &grid, Field<double> &
 
 void store_default(netCDF::NcFile &file, const Parameters &param, Field<double> &psi, Field<double> &F, double &sigma) {
   // output to a file 
-  auto offormat_v = param.offormat | std::views::transform([](auto c){ return static_cast<char>(std::tolower(c)); });
-  std::string offormat_l(offormat_v.begin(), offormat_v.end());
+  std::string offormat_l = to_lower(param.offormat);
 
   if (offormat_l == "netcdf") {
 #ifdef USE_NETCDF
@@ -624,6 +642,8 @@ int main() {
 	store_field(file, B_z, "B_z", {"r", "z"});
 	store_vector(file, grid.r, "r", grid.N_r, "r");
 	store_vector(file, grid.z, "z", grid.N_z, "z");
+
+	std::cout << "\nWrote the result to: " << param.ofname << std::endl;        
   } else {
     std::cerr << "Nothing selected." << std::endl;
   }

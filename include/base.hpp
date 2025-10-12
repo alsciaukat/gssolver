@@ -93,23 +93,28 @@ class InitialCondition {
 public:
   const Parameters &param;
   InitialCondition(const Parameters &param);
-  virtual double p_prime(double psi) = 0;
-  virtual double gg_prime(double psi) = 0;
+  virtual double p_prime(double psi, double r) = 0;
+  virtual double gg_prime(double psi, double r) = 0;
   virtual ~InitialCondition() = default;
 };
 
 class SolovevCondition : public InitialCondition {
 public:
   using InitialCondition::InitialCondition;
-  double p_prime(double psi) override;  
-  double gg_prime(double psi) override;  
+  double p_prime(double psi, double r) override;  
+  double gg_prime(double psi, double r) override;  
 };
 
 class PolynomialCondition : public InitialCondition {
   using InitialCondition::InitialCondition;
-  double p_prime(double psi) override;  
-  double gg_prime(double psi) override;  
+  double p_prime(double psi, double r) override;  
+  double gg_prime(double psi, double r) override;  
 };
 
+class HModeCondition : public InitialCondition {
+  using InitialCondition::InitialCondition;
+  double p_prime(double psi, double r) override;  
+  double gg_prime(double psi, double r) override;  
+};
 
 #endif
