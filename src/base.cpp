@@ -209,7 +209,7 @@ double PolynomialCondition::gg_prime(double psi, double r) {
 const double d = 0.02;
 const double betaH = 0.6;
 const double p_prime0 = 0.18;
-const double psi0 = 0.95;
+const double psi0 = 0.78;
 const double h = 0.9;
 const double D = 0.036;
 const double j_bs0 = 0.4;

@@ -155,6 +155,7 @@ def extrct_plots():
         v = file.variables[name][:]
         fig, ax = plt.subplots(1, 1)
         overlay = ax.contourf(R, Z, v, levels=100, cmap='viridis', alpha=0.5)
+        ax.set(xlabel="r", ylabel="z", title=name)
         fig.colorbar(overlay)
         fig.savefig(prefix + name + ".png")
         del fig, ax, overlay
