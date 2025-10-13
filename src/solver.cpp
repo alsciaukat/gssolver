@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -23,6 +24,18 @@ void update_F(Field<double> &F, Field<double> &psi, InitialCondition &cond, cons
   }
 }
 
+void update_F_unnormalized(Field<double> &F, Field<double> &psi, InitialCondition &cond, const Parameters &param, const double sigma) {
+  const Grid &grid = psi.grid;
+  const std::vector<double> &r = grid.r;
+  for (int i = 0; i < grid.N_r; i++) {
+    for (int j = 0; j < grid.N_z; j++) {
+      F[i, j] = -(mu0 * r[i] * r[i] * cond.p_prime(psi[i, j], r[i]) +
+                  cond.gg_prime(psi[i, j], r[i])) + 1e-100;
+	  F[i, j] /= std::sqrt(std::abs(sigma));
+    }
+  }
+}
+
 void update_sigma(double &sigma, Field<double> &F, const Parameters &param) {
   double I = 0;
   const Grid &grid = F.grid;
@@ -39,12 +52,12 @@ void update_sigma(double &sigma, Field<double> &F, const Parameters &param) {
   else sigma = param.I_p / (param.psi_bdry * I);
 }
 
-std::pair<int , int> normalize(Field<double> &psi, const Parameters &param) {
+std::pair<int , int> normalize_old(Field<double> &psi, const Parameters &param) {
   const Grid &grid = psi.grid;
   // normalize psi between 0 at the minimum and 1 at the boundary
   double psi_min = INFINITY;
-  int i_min;
-  int j_min;
+  int i_min = 0;
+  int j_min = 0;
   for (int i = 0; i < grid.N_r; i++) {
     for (int j = 0; j < grid.N_z; j++) {
 	  if (grid.boundary[i][j].domain == Domain::EXT) continue;
@@ -57,8 +70,11 @@ std::pair<int , int> normalize(Field<double> &psi, const Parameters &param) {
   }
   int i = i_min;
   int j = j_min;
-  if (grid.boundary[i][j].domain != Domain::INT)
-    throw std::range_error("Minimum of psi is not interior");
+  if (grid.boundary[i][j].domain != Domain::INT) {
+	throw std::logic_error("Minimum of psi is not interior");
+  }
+    
+    // throw std::range_error("Minimum of psi is not interior");
   if (grid.boundary[i + 1][j + 1].domain == Domain::EXT ||
       grid.boundary[i + 1][j - 1].domain == Domain::EXT ||
       grid.boundary[i - 1][j + 1].domain == Domain::EXT ||
@@ -121,7 +137,8 @@ std::pair<int , int> normalize(Field<double> &psi, const Parameters &param) {
   if (psi_min_p < psi_min)
     std::cerr << "WARNING: Minimum is not accurate. Might cause problem.\n";
 
-  if (param.verbose) std::cout << "psi(r_min, z_min) = " << psi_min << "\n";
+  if (param.verbose)
+	std::cout << "psi(r_min, z_min) = " << psi_min << "\n";
 
   // normalize ψ
   for (double &x : psi.value | std::views::join) {
@@ -129,6 +146,113 @@ std::pair<int , int> normalize(Field<double> &psi, const Parameters &param) {
   }
   return {i, j};
 }
+
+std::pair<int , int> normalize(Field<double> &psi, const Parameters &param, double &sigma) {
+  const Grid &grid = psi.grid;
+  // normalize psi between 0 at the minimum and 1 at the boundary
+  double psi_min = INFINITY;
+  int i_min = 0;
+  int j_min = 0;
+  for (int i = 0; i < grid.N_r; i++) {
+    for (int j = 0; j < grid.N_z; j++) {
+	  if (grid.boundary[i][j].domain == Domain::EXT) continue;
+      if (psi[i, j] < psi_min) {
+        psi_min = psi[i, j];
+        i_min = i;
+        j_min = j;
+      }
+    }
+  }
+  int i = i_min;
+  int j = j_min;
+  if (grid.boundary[i][j].domain != Domain::INT) {
+	throw std::logic_error("Minimum of psi is not interior");
+  }
+    
+    // throw std::range_error("Minimum of psi is not interior");
+  if (grid.boundary[i + 1][j + 1].domain == Domain::EXT ||
+      grid.boundary[i + 1][j - 1].domain == Domain::EXT ||
+      grid.boundary[i - 1][j + 1].domain == Domain::EXT ||
+      grid.boundary[i - 1][j - 1].domain == Domain::EXT)
+    std::cerr << "WARNING: The minimum is almost on the boundary. Do not trust "
+                 "the result.\n"
+              << std::endl;
+
+  const std::vector<double> &r = grid.r;
+  const std::vector<double> &z = grid.z;
+  const double &h = grid.h;
+  double r_min = grid.r[i];
+  double z_min = grid.z[j]; // they are not minimum yet
+  double r_delta;
+  double z_delta;
+
+  // finding the minimum point iteratively
+  //
+  // Succesive second-order univariate interpolation is used to
+  // approximate the true minimum.
+  // the solutions of the interpolation for r_min and z_min are rational
+  // function of quartic polynomials, and analytic solution is not simple.
+  //
+  // r_min and z_min can be represented by each other, so this is iterating
+  // between the two.  
+  do {
+    double r_min_p = r_min;
+    double z_min_p = z_min;
+    r_min =
+        (r[i] + r[i - 1]) / 2 - h *
+                                    (psi.interpolate_z(i, j, z_min) -
+                                     psi.interpolate_z(i - 1, j, z_min)) /
+                                    (psi.interpolate_z(i + 1, j, z_min) -
+                                     2 * psi.interpolate_z(i, j, z_min) +
+                                     psi.interpolate_z(i - 1, j, z_min));
+    z_min =
+        (z[j] + z[j - 1]) / 2 - h *
+                                    (psi.interpolate_r(i, j, r_min) -
+                                     psi.interpolate_r(i, j - 1, r_min)) /
+                                    (psi.interpolate_r(i, j + 1, r_min) -
+                                     2 * psi.interpolate_r(i, j, r_min) +
+                                     psi.interpolate_r(i, j - 1, r_min));
+    r_delta = r_min - r_min_p;
+    z_delta = z_min - z_min_p;
+  } while (std::abs(r_delta / r_min) > param.e_min ||
+           std::abs(z_delta / z_min) > param.e_min);
+  if (param.verbose) std::cout << "(r_min, z_min): (" << r_min << ", " << z_min << ")\n";
+
+  double psi_min_p = psi_min;
+  psi_min = psi.interpolate_z(i - 1, j, z_min) +
+            (r_min - r[i - 1]) *
+                (psi.interpolate_z(i, j, z_min) -
+                 psi.interpolate_z(i - 1, j, z_min)) /
+                h +
+            (r_min - r[i - 1]) * (r_min - r[i]) *
+                (psi.interpolate_z(i + 1, j, z_min) -
+                 2 * psi.interpolate_z(i, j, z_min) +
+                 psi.interpolate_z(i - 1, j, z_min)) /
+                (2 * h * h);
+  if (psi_min_p < psi_min)
+    std::cerr << "WARNING: Minimum is not accurate. Might cause problem.\n";
+
+  if (param.verbose)
+	std::cout << "psi(r_min, z_min) = " << psi_min << "\n";
+
+  // normalize ψ
+  for (double &x : psi.value | std::views::join) {
+    x = (x - psi_min) / (param.psi_l - psi_min) * param.psi_l;
+  }
+  sigma = std::pow( param.psi_l / (param.psi_l - psi_min), 2);
+  return {i, j};
+}
+
+void denormalize(Field<double> &psi, double sigma) {
+  Grid grid = psi.grid;
+  for (int i = 0; i < grid.N_r; i++) {
+    for (int j = 0; j < grid.N_z; j++) {
+	  psi[i, j] = psi[i, j] / std::sqrt(std::abs(sigma));
+
+      }
+    }
+}
+
 
 void sor_old(Field<double> &psi, Field<double> &F,
          const double &sigma, const Parameters &param) {
@@ -270,6 +394,79 @@ void sor(Field<double> &psi, Field<double> &F,
   } while (!converged);
 }
 
+void sor_unnormalized(Field<double> &psi, Field<double> &F,
+         const Parameters &param) {
+  // find solution to Grad-Shafranov equaiton using
+  // successive over relation with fixed right-hand side evaluated
+  // at the ψ from the previous step.  
+  const Grid &grid = psi.grid;
+  const Array<BoundaryInfo> &boundary = grid.boundary;
+  const std::vector<double> &r = grid.r;
+  double h = grid.h;
+
+  bool converged;
+  int n_it = 0;
+  do {
+    converged = true;
+    for (int i = 0; i < grid.N_r; i++) {
+      for (int j = 0; j < grid.N_z; j++) {
+        if (boundary[i][j].domain == Domain::EXT)
+          continue;
+        double psi_delta;
+        if (boundary[i][j].domain == Domain::INT) {
+          // psi_delta =
+		  // 	((1 - h / (2*r[i])) * psi[i + 1, j] + (1 + h / (2*r[i])) * psi[i - 1, j] -
+          //      4 * psi[i, j] + psi[i, j + 1] + psi[i, j - 1] -
+          //      h * h * sigma * F[i, j]) /
+          //     4;
+		  double a = 1 / (1 + h / (2 * r[i]));
+		  double b = 1 / (1 - h / (2 * r[i]));
+		  double c = a + b + 2;
+		  psi_delta =
+			  (a * psi[i + 1, j] + b * psi[i - 1, j] - c * psi[i, j] +
+			   psi[i, j + 1] + psi[i, j - 1] - h * h * F[i, j]) /
+			  c;
+        } else if (boundary[i][j].domain == Domain::BDRY) {
+          double alpha1 = boundary[i][j].alpha1;
+          if (alpha1 < 1)
+            psi[i - 1, j] = param.psi_l;
+          double alpha2 = boundary[i][j].alpha2;
+          if (alpha2 < 1)
+            psi[i + 1, j] = param.psi_l;
+          double beta1 = boundary[i][j].beta1;
+          if (beta1 < 1)
+            psi[i, j - 1] = param.psi_l;
+          double beta2 = boundary[i][j].beta2;
+          if (beta2 < 1)
+            psi[i, j + 1] = param.psi_l;
+          double denom_a = alpha1 * alpha2 * (alpha1 + alpha2);
+          double denom_b = beta1 * beta2 * (beta1 + beta2);
+          double denom_t =
+              2 * (alpha1 + alpha2) / denom_a + 2 * (beta1 + beta2) / denom_b -
+              (alpha1 * alpha1 - alpha2 * alpha2) * h / (denom_a * r[i]);
+          psi_delta =
+              (((2 * alpha2 + alpha2 * alpha2 * h / r[i]) * psi[i - 1, j] +
+                (2 * alpha1 - alpha1 * alpha1 * h / r[i]) * psi[i + 1, j] +
+                (-2 * (alpha1 + alpha2) +
+                 (alpha1 * alpha1 - alpha2 * alpha2) * h / r[i]) *
+                    psi[i, j]) /
+                   denom_a +
+               (2 * beta2 * psi[i, j - 1] - 2 * (beta1 + beta2) * psi[i, j] +
+                2 * beta1 * psi[i, j + 1]) /
+                   denom_b -
+               h * h * F[i, j]) /
+              denom_t;
+        } else
+          throw std::invalid_argument("Domain is not known");
+        psi[i, j] = psi[i, j] + param.omega * psi_delta;
+
+        if (std::abs(psi_delta / psi[i, j]) > param.e_sor)
+          converged = false;
+      }
+    }
+  } while (!converged);
+}
+
 double get_max_error(Field<double> &a, Field<double> &b) {
   double N_r = a.value.size();
   double N_z = a.value[0].size();
@@ -352,6 +549,7 @@ int initialize(Parameters &param) {
   SET(solver, I_p, double, I_p, 500e3);
   SET(solver, psi_l, double, psi_l, 1);
   SET(solver, psi_bdry, double, psi_bdry, 0.1);
+  SET(solver, sigma0, double, sigma0, 1e8);
   return 0;
 }
 
@@ -371,17 +569,13 @@ get_initial_condition(const Parameters &param) {
   }    
   if (ictype_l == "solovev") {
 	std::cout << "Using Solovev Profile" << std::endl;
-    return std::make_unique<HModeCondition>(param);
+    return std::make_unique<SolovevCondition>(param);
   }    
   std::cout << "Initial condition type not known. Defaulting to Solovev Condition." << std::endl;
   return std::make_unique<SolovevCondition>(param);
 }
 
 std::pair<int, int> solve_default(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond) {
-  // initializations
-  update_F(F, psi, cond, param);
-  if (param.ictype != "solovev") update_sigma(sigma, F, param);
-
   int n_fix = 0;
   Field<double> psi_p(grid, param, 1);
 
@@ -413,16 +607,102 @@ std::pair<int, int> solve_default(const Parameters &param, const Grid &grid, Fie
 		std::cout << "Sigma: " << sigma << "\n";
 	}
 
+	update_F(F, psi, cond, param);
+	update_sigma(sigma, F, param);
+    psi_p = psi;
+	min_index = normalize_old(psi, param);
+
+    sor(psi, F, sigma, param);
+
+	// max_error = get_max_error(psi, psi_p);
+	l2_error = get_l2_error(psi, psi_p);
+	if (param.verbose) {
+		std::cout << "L2 Error: " << l2_error << "\n";
+	} else {
+	  std::cout << "# iter: " << n_fix << "\t" << "L2 error: " << l2_error << "\r";
+	}          
+  } while (l2_error > param.e_fix);
+  std::cout << "\n";
+  min_index = normalize(psi, param, sigma);
+  return min_index;
+}
+
+std::pair<int, int> solve_new(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, double &sigma, InitialCondition &cond) {
+  int n_fix = 0;
+  Field<double> psi_p(grid, param, 1);
+
+  double max_error;  
+  double l2_error;
+  std::pair<int, int> min_index{grid.N_r/2, grid.N_z/2};
+
+  do {
+	// The Grad-Shafranov can be rewritten:
+	//     Δ*ψ = σ F(ψ)
+	// where Δ* is the elliptic toroidal operator that is
+	// simply equivalent to the left-hand side of Grad-Shafranov equation.
+	//
+	// Two nested iteration is used to solve this:
+	// outer iteration is a fixed-point iteration where the right-hand side
+	// is evaluated by ψ⁽ⁿ⁾ and the equation is solved to obtain ψ⁽ⁿ⁺¹⁾.
+	//     Δ*ψ = σ F(ψ⁽ⁿ⁾)
+	// This elliptic partial differential equation is then solved using
+	// the inner iteration called succesive over relaxation (SOR) method.
+	//
+	// ψ stays normalized between 0 and 1, with the aid of
+	// appropriate scaling by σ which is calculated such that the toroidal
+	// current I_p is kept constant.
+	// See /Accurate calculation of the gradients of the equilibrium poloidal
+	// flux in tokamaks/ by M. Woo, G. Jo, B. H. Park, A. Y. Aydemir, J. H. Kim.
+	n_fix++;
+	if (param.verbose) {
+		std::cout << "\nFixed-point Iteration: " << n_fix << "\n";
+		std::cout << "Sigma: " << sigma << "\n";
+	}
+
+	update_F(F, psi, cond, param);
+
+	// update_sigma(sigma, F, param);
+	min_index = normalize(psi, param, sigma);
     psi_p = psi;
 
     sor(psi, F, sigma, param);
-    if (param.ictype != "solovev") {
-	  min_index = normalize(psi, param);
+	denormalize(psi, sigma);
+
+
+	// max_error = get_max_error(psi, psi_p);
+	l2_error = get_l2_error(psi, psi_p);
+	if (param.verbose) {
+		std::cout << "L2 Error: " << l2_error << "\n";
+	} else {
+	  std::cout << "# iter: " << n_fix << "\t" << "L2 error: " << l2_error << "\r";
+	}          
+  } while (l2_error > param.e_fix);
+  std::cout << "\n";
+  min_index = normalize(psi, param, sigma);
+  return min_index;
+}
+std::pair<int, int> solve_unnormalized(const Parameters &param, const Grid &grid, Field<double> &psi, Field<double> &F, InitialCondition &cond) {
+  // initializations
+
+  int n_fix = 0;
+  Field<double> psi_p(grid, param, 1);
+
+  double max_error;  
+  double l2_error;
+  std::pair<int, int> min_index{grid.N_r/2, grid.N_z/2};
+
+  do {
+	n_fix++;
+	if (param.verbose) {
+		std::cout << "\nFixed-point Iteration: " << n_fix << "\n";
 	}
 
-    update_F(F, psi, cond, param);
-    if (param.ictype != "solovev") update_sigma(sigma, F, param);
-	// max_error = get_max_error(psi, psi_p);
+	update_F(F, psi, cond, param);
+    psi_p = psi;
+
+    sor(psi, F, 1, param);
+
+    // max_error = get_max_error(psi, psi_p);
 	l2_error = get_l2_error(psi, psi_p);
 	if (param.verbose) {
 		std::cout << "L2 Error: " << l2_error << "\n";
@@ -470,7 +750,7 @@ std::pair<int, int> solve_polynomial(const Parameters &param, const Grid &grid, 
     std::cout << "Sigma: " << sigma << "\n";
 
     sor(psi, F, sigma, param);
-	min_index = normalize(psi, param);
+	min_index = normalize(psi, param, sigma);
 
     update_F(F, psi, cond, param);
     update_sigma(sigma, F, param);
@@ -606,70 +886,151 @@ void run_polynomial(Parameters &param) {
   store_vector(file, l2_errors, "l2_error", l2_errors.size(), "i");
 }
 
+double get_g(double psi, std::vector<double> &psi_range,
+             std::vector<double> &g) {
+  int left = 0, right = psi_range.size() - 1;
+  if (psi > psi_range[right] || psi < psi_range[left]) throw std::range_error("Get G: Out of range");
+  while (left != right) {
+	int middle = (left + right) / 2 + 1;
+	if (psi_range[middle] > psi) {
+	  right = middle - 1;
+	} else {
+	  left = middle;
+	}
+  }
+  return g[left];
+}
+
 int main() {
   std::cout << std::fixed << std::setprecision(15);
   Parameters param;
   initialize(param);
   if (param.select == "solovev") {
-    run_solovev(param);
+	run_solovev(param);
   } else if (param.select == "polynomial") {
-    run_polynomial(param);
+	run_polynomial(param);
   } else if (param.select == "blender") {
-	double sigma = 1;
+	double sigma = param.sigma0;
 	auto cond = get_initial_condition(param);
 	Grid grid(param);
 	netCDF::NcFile file(param.ofname, netCDF::NcFile::replace);
 
     Field<double> psi(grid, param, 1);
+    for (int i = 0; i < grid.N_r; i++) {
+      for (int j = 0; j < grid.N_z; j++) {
+		if (grid.boundary[i][j].domain != Domain::INT) continue;
+		psi[i, j] = (grid.r[i] - param.R) * (grid.r[i] - param.R) + grid.z[j] * grid.z[j] / std::sqrt(std::abs(param.sigma0)) + 0.9;
+	  }        
+	}
     Field<double> F(grid, param, 0);
-	std::pair<int, int> min_index =  solve_default(param, grid, psi, F, sigma, *cond);
+    std::pair<int, int> min_index =
+		solve_default(param, grid, psi, F, sigma, *cond);
 
     // Field<Vector> J(grid, param, {0, 0, 0});
     // Field<Vector> B(grid, param, {0, 0, 0});
-	Field<double> J_r(grid, param, 0);
-	Field<double> J_phi(grid, param, 0);
-	Field<double> J_z(grid, param, 0);
-	Field<double> B_r(grid, param, 0);
-	Field<double> B_phi(grid, param, 0);
-	Field<double> B_z(grid, param, 0);
-	std::vector<double> psi_v(grid.N_r - min_index.first, 0);
-	std::vector<double> p_prime(grid.N_r - min_index.first, 0);
-	std::vector<double> gg_prime(grid.N_r - min_index.first, 0);
+    Field<double> psi_true(grid, param, 1);
+    Field<double> F_true(grid, param, 0);
+    Field<double> J_r(grid, param, 0);
+    Field<double> J_phi(grid, param, 0);
+    Field<double> J_z(grid, param, 0);
+    Field<double> B_r(grid, param, 0);
+    Field<double> B_phi(grid, param, 0);
+    Field<double> B_z(grid, param, 0);
+    // absolute value is just for debugging. Sigma is required to be positive.
+    double psi_bdry = 1 / std::sqrt(std::abs(sigma));
 
-	for (int i = 0; i < grid.N_r - min_index.first; i++) {
-	  psi_v[i] = psi[min_index.first + i, min_index.second];
-	  p_prime[i] = (*cond).p_prime(psi_v[i], grid.r[i]);
-	  gg_prime[i] = (*cond).gg_prime(psi_v[i], grid.r[i]);
-	}          
+    // unnormalize
+    for (int i = 0; i < grid.N_r; i++) {
+      for (int j = 0; j < grid.N_z; j++) {
+        psi_true[i, j] = psi[i, j] * psi_bdry;
+        F_true[i, j] = F[i, j] * psi_bdry;
+      }
+    }
+
+    int i_max = 0;
+    double psi_max = -INFINITY;
+    for (int i = min_index.first; i < grid.N_r; i++) {
+      if (psi_true[i, min_index.second] > psi_max) {
+        psi_max = psi_true[i, min_index.second];
+        i_max = i;
+      }
+    }
+    int N_range = i_max - min_index.first + 1;
+    std::vector<double> psi_range(N_range, 0);
+    std::vector<double> p_prime(N_range, 0);
+    std::vector<double> gg_prime(N_range, 0);
+    std::vector<double> g_sq(N_range, 0);
+    std::vector<double> g(N_range, 0);
+    std::vector<double> g_prime(N_range, 0);
+    std::vector<double> p(N_range, 0);
+
+    for (int i = 0; i < N_range; i++) {
+      int ri = min_index.first + i;
+      int zi = min_index.second;
+      psi_range[i] = psi[ri, zi];
+      p_prime[i] = (*cond).p_prime(psi_range[i], grid.r[ri]) * psi_bdry;
+      gg_prime[i] = (*cond).gg_prime(psi_range[i], grid.r[ri]) * psi_bdry;
+      psi_range[i] = psi_range[i] * psi_bdry;
+    }
+	p[N_range - 1] = -p_prime[N_range - 1] *
+						(psi_range[N_range - 1] - psi_range[N_range - 2]);
+	g_sq[N_range - 1] = -2 * gg_prime[N_range - 1] *
+						(psi_range[N_range - 1] - psi_range[N_range - 2]);
+    for (int i = N_range - 2; i >= 0; i--) {
+        p[i] = p[i + 1] - p_prime[i] * (psi_range[i + 1] - psi_range[i]);
+
+        g_sq[i] =
+            g_sq[i + 1] - 2 * gg_prime[i] * (psi_range[i + 1] - psi_range[i]);
+    }
+    double g_sq_min = *std::min_element(g_sq.begin(), g_sq.end());
+    double p_min = *std::min_element(p.begin(), p.end());
+    if (g_sq_min < 0) {
+      for (int i = 0; i < N_range; i++) {
+        g_sq[i] += - 2 * g_sq_min;
+      }
+    }
+    if (p_min < 0) {
+      for (int i = 0; i < N_range; i++) {
+        p[i] += - 2 * p_min;
+      }
+    }
+    for (int i = N_range - 1; i >= 0; i--) {
+        g[i] = std::sqrt(g_sq[i]);
+        g_prime[i] = gg_prime[i] / g[i];		
+    }
+    std::cout << "p and g computed\n";
 	for (int i = 0; i < grid.N_r; i++) {
       for (int j = 0; j < grid.N_z; j++) {
 		if (grid.boundary[i][j].domain != Domain::INT) continue;
-        J_phi[i, j] = -F[i, j] / (grid.r[i] * mu0 * std::sqrt(std::abs(sigma)));
-        B_phi[i, j] =
-            std::sqrt(grid.b * grid.R * grid.R * (1 - psi[i, j])) / grid.r[i];
-        double phi_r = (psi[i + 1, j] - psi[i - 1, j]) / (2 * grid.h);
-        double phi_z = (psi[i, j + 1] - psi[i, j - 1]) / (2 * grid.h);
+        J_phi[i, j] = -F_true[i, j] / (grid.r[i] * mu0);
+		B_phi[i, j] = get_g(psi_true[i, j], psi_range, g) / grid.r[i];
+        double phi_r = (psi_true[i + 1, j] - psi_true[i - 1, j]) / (2 * grid.h);
+        double phi_z = (psi_true[i, j + 1] - psi_true[i, j - 1]) / (2 * grid.h);
 		B_r[i, j] = - phi_z / grid.r[i];
 		B_z[i, j] = phi_r / grid.r[i];
-		J_r[i, j] = - grid.b * grid.R * grid.R * phi_r / (2* grid.r[i] * std::sqrt(grid.b * grid.R * grid.R * (1 - psi[i, j])));
-		J_z[i, j] = grid.b * grid.R * grid.R * phi_z / (2* grid.r[i] * std::sqrt(grid.b * grid.R * grid.R * (1 - psi[i, j])));
+		J_r[i, j] = - phi_z * get_g(psi_true[i, j], psi_range, g_prime) / (mu0 * grid.r[i]);
+		J_z[i, j] = phi_r * get_g(psi_true[i, j], psi_range, g_prime) / (mu0 * grid.r[i]);
       }
     }
-	store_field(file, psi, "psi", {"r", "z"});
-	store_field(file, F, "F", {"r", "z"});
+	std::cout << "B and J computed\n";
+	store_vector(file, grid.r, "r", grid.N_r, "r");
+	store_vector(file, grid.z, "z", grid.N_z, "z");
+	store_field(file, psi_true, "psi", {"r", "z"});
+	store_field(file, F_true, "F", {"r", "z"});
 	store_field(file, J_r, "J_r", {"r", "z"});
 	store_field(file, J_phi, "J_phi", {"r", "z"});
 	store_field(file, J_z, "J_z", {"r", "z"});
 	store_field(file, B_r, "B_r", {"r", "z"});
 	store_field(file, B_phi, "B_phi", {"r", "z"});
 	store_field(file, B_z, "B_z", {"r", "z"});
-	store_vector(file, grid.r, "r", grid.N_r, "r");
-	store_vector(file, grid.z, "z", grid.N_z, "z");
 
+    store_vector(file, psi_range, "psi_range", psi_range.size(), "psi_v");        
     store_vector(file, p_prime, "p_prime", p_prime.size(), "psi_v");        
+    store_vector(file, p, "p", p.size(), "psi_v");        
     store_vector(file, gg_prime, "gg_prime", gg_prime.size(), "psi_v");        
-    store_vector(file, psi_v, "psi_v", psi_v.size(), "psi_v");        
-	std::cout << "\nWrote the result to: " << param.ofname << std::endl;        
+    store_vector(file, g_prime, "g_prime", g_prime.size(), "psi_v");        
+    store_vector(file, g, "g", g.size(), "psi_v");        
+	std::cout << "\nWrote the result to: " << param.ofname << std::endl;
   } else {
     std::cerr << "Nothing selected." << std::endl;
   }

@@ -32,6 +32,7 @@ struct Parameters {
   double e_fix, e_sor, e_min, omega;
   double I_p, psi_bdry;
   double psi_l;
+  double sigma0;
   std::string ofname;
   std::string offormat;
   bool verbose;

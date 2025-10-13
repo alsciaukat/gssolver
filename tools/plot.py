@@ -126,6 +126,7 @@ def debug():
 
 def plot_output():
     file = nc.Dataset("hmode_output.nc", "r")
+    psi = file.variables["psi"][:]
     J_phi = file.variables["J_phi"][:]
     J_r = file.variables["J_r"][:]
     J_z = file.variables["J_z"][:]
@@ -134,26 +135,29 @@ def plot_output():
     B_z = file.variables["B_z"][:]
     r = file.variables["r"][:]
     z = file.variables["z"][:]
-    psi_v = file.variables["psi_v"][:]
-    p_prime = file.variables["p_prime"][:]
-    gg_prime = file.variables["gg_prime"][:]
+    # psi_v = file.variables["psi_v"][:]
+    # p_prime = file.variables["p_prime"][:]
+    # gg_prime = file.variables["gg_prime"][:]
     R, Z = np.meshgrid(r, z, indexing="ij")
-    overlay = plt.contourf(R, Z, B_z, levels=100, cmap='viridis', alpha=0.5)
-    plt.plot(psi_v, gg_prime)
+    overlay = plt.contourf(R, Z, B_r, levels=100, cmap='viridis', alpha=0.5)
+    plt.colorbar(overlay)
+    # plt.plot(psi_v, gg_prime)
+    plt.show()
 
 
 def extrct_plots():
-    file = nc.Dataset("hmode_output.nc", "r")
-    prefix = "hmode"
+    file = nc.Dataset("poly_output.nc", "r")
+    prefix = "unnorm_poly"
     r = file.variables["r"][:]
     z = file.variables["z"][:]
     R, Z = np.meshgrid(r, z, indexing="ij")
-    for name in ["J_phi", "J_r", "J_z", "B_phi", "B_r", "B_z"]:
+    for name in ["psi", "J_phi", "J_r", "J_z", "B_phi", "B_r", "B_z"]:
         v = file.variables[name][:]
-        overlay = plt.contourf(R, Z, v, levels=100, cmap='viridis', alpha=0.5)
-        plt.colorbar(overlay)
-        plt.savefig(prefix + name + ".png")
-
+        fig, ax = plt.subplots(1, 1)
+        overlay = ax.contourf(R, Z, v, levels=100, cmap='viridis', alpha=0.5)
+        fig.colorbar(overlay)
+        fig.savefig(prefix + name + ".png")
+        del fig, ax, overlay
 
 
 if __name__ == "__main__":

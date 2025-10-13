@@ -23,7 +23,7 @@ N = 100
 # format = "netCDF"
 
 name = "hmode_output.nc"
-vebose = false
+verbose = true
 print_psi = false
 
 N_gr = 17
@@ -34,33 +34,36 @@ delta_logh = 0.1
 
 # relative error for the fixed-point iteration
 # maximum 1e-14, usual 1e-8
-e_fix = 1e-4
+e_fix = 1e-10
 
 # relative error for Succesive Over Relaxation
 # it suddenly takes very long if e_sor < 1e-14
-e_sor = 1e-5
+e_sor = 1e-11
 
 # relaxation coefficient. Diverges if ≥ 2.
 # fast but imprecise if close to 2, slow but precise close to 1
-omega = 1.5
+omega = 1.9
 
 # relative error for the minimum at the normalization step
-e_min = 1e-5
+e_min = 1e-11
 
 # The total current
-I_p = 500e3
-
+# I_p = 500e3
+I_p = 50
 # psi at the computational boundary
 psi_l = 1
 
 # psi at the physical plasma boudnary
 psi_bdry = 0.1
 
+normalize = false
+sigma0 = 1e4
+
 [initial_condition]
 
 # Choose p(psi) and g(psi)
 # "solovev", "polynomial", "HMode" are supported.
-type = "HMode"
+type = "hmode"
 beta0 = 0.5
 m = 2
 n = 1
