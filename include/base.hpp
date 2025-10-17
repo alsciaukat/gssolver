@@ -100,6 +100,9 @@ public:
   T interpolate_r(int i, int j, double rr) const;
 };
 
+class HModeCondition;
+class DiamagneticCondition;
+
 class InitialCondition {
 public:
   const Parameters &param;
@@ -124,6 +127,9 @@ public:
 	throw std::logic_error("Non Implemented");
 	return 0;
   }
+  operator HModeCondition() const;
+  operator DiamagneticCondition() const;
+
   virtual ~InitialCondition() = default;
 };
 
@@ -135,14 +141,17 @@ public:
 };
 
 class PolynomialCondition : public InitialCondition {
+public:
   using InitialCondition::InitialCondition;
   double p_prime(double psi) const override;  
   double ff_prime(double psi) const override;  
 };
 
 class HModeCondition : public InitialCondition {
+public:
   using InitialCondition::InitialCondition;
   double p(double psi) const override;
+  double p_ped(double psi) const;
   double f(double psi) const override;
   double p_prime(double psi) const override;  
   double f_prime(double psi) const override;  
@@ -150,9 +159,11 @@ class HModeCondition : public InitialCondition {
 };
 
 class DiamagneticCondition : public InitialCondition {
+public:
   using InitialCondition::InitialCondition;
   double p(double psi) const override;
   double f(double psi) const override;
+  double f_delta(double psi) const;
   double p_prime(double psi) const override;  
   double f_prime(double psi) const override;  
   double ff_prime(double psi) const override;  

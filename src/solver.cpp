@@ -594,7 +594,8 @@ int initialize(Parameters &param) {
   SET(grid, k, double, k, 0.11)
   SET(grid, tolerance, double, tolerance, 0.1)
 #ifdef USE_NETCDF
-  SET(output, format, std::string, offormat, "netCDF")
+  SET(output, format, std::string, offormat, "netcdf")
+	param.offormat = to_lower(param.offormat);
   SET(output, name, std::string, ofname, "result.nc")
 #else
   SET(output, format, std::string, offormat, "csv")
@@ -607,6 +608,7 @@ int initialize(Parameters &param) {
   SET(output, logh_low, double, logh_low, -2.4)
   SET(output, delta_logh, double, delta_logh, 0.1)
   SET(initial_condition, type, std::string, ictype, "solovev");
+	param.ictype = to_lower(param.ictype);
   SET(initial_condition, psi_start, double, psi_start, 0.4);
   SET(initial_condition, psi_end, double, psi_end, 0.7);
   SET(initial_condition, beta0, double, beta0, 0.5);
@@ -638,20 +640,19 @@ get_initial_condition(const Parameters &param) {
   // *factory pattern*
   // this function returns a pointer to
   // a concrete class of `InitialCondition`.
-  std::string ictype_l = to_lower(param.ictype);
-  if (ictype_l == "polynomial") {
+  if (param.ictype == "polynomial") {
 	std::cout << "Using Polynomial Profile" << std::endl;
     return std::make_unique<PolynomialCondition>(param);
   }
-  if (ictype_l == "hmode") {
+  if (param.ictype == "hmode") {
 	std::cout << "Using H-Mode Profile" << std::endl;
     return std::make_unique<HModeCondition>(param);
   }    
-  if (ictype_l == "solovev") {
+  if (param.ictype == "solovev") {
 	std::cout << "Using Solovev Profile" << std::endl;
     return std::make_unique<SolovevCondition>(param);
   }    
-  if (ictype_l == "diamagnetic") {
+  if (param.ictype == "diamagnetic") {
 	std::cout << "Using Diamagnetic Profile" << std::endl;
     return std::make_unique<DiamagneticCondition>(param);
   }    
@@ -868,16 +869,14 @@ std::pair<int, int> solve_polynomial(const Parameters &param, const Grid &grid, 
 
 void store_default(netCDF::NcFile &file, const Parameters &param, Field<double> &psi, Field<double> &F, double &sigma) {
   // output to a file 
-  std::string offormat_l = to_lower(param.offormat);
-
-  if (offormat_l == "netcdf") {
+  if (param.offormat == "netcdf") {
 #ifdef USE_NETCDF
     store_netcdf(file, psi, F, sigma, param);
 	std::cout << "Wrote to: " << param.ofname << std::endl;
 #else
     throw std::invalid_argumet("Output to NetCDF is not supported. Change output.format to csv");
 #endif
-  } else if (offormat_l == "csv") {
+  } else if (param.offormat == "csv") {
 	store_csv(psi, param.ofname);
 	std::cout << "Wrote to: " << param.ofname << std::endl;
   } else {
@@ -1135,8 +1134,6 @@ int main() {
   double sigma = param.sigma0;
   auto cond = get_initial_condition(param);
   Grid grid(param);
-  netCDF::NcFile file(param.ofname, netCDF::NcFile::replace);
-
   Field<double> psi(grid, param, 1);
   for (int i = 0; i < grid.N_r; i++) {
     for (int j = 0; j < grid.N_z; j++) {
@@ -1156,7 +1153,10 @@ int main() {
   Field<Vector> J(grid, param, {0, 0, 0});
   Field<Vector> B(grid, param, {0, 0, 0});
   Field<double> p(grid, param, 0);
+  Field<double> p_ped(grid, param, 0);
+  Field<double> f_delta(grid, param, 0);
   Field<double> f(grid, param, 0);
+  Field<double> psi_N = get_normalized(psi, param);
   calculate_outputs(J, B, p, f, psi, F, *cond, param);
 
   auto [i_min, j_min, i_max, _, psi_min, psi_max] = get_range(psi, param);  
@@ -1179,6 +1179,23 @@ int main() {
     p_range[i] = (*cond).p(psi_range_N[i]);
     f_range[i] = (*cond).f(psi_range_N[i]);
   }
+  if (param.ictype == "hmode") {
+	HModeCondition &hmode_cond = dynamic_cast<HModeCondition&>(*cond.get());
+    for (int i = 0; i < grid.N_r; i++) {
+	  for (int j = 0; j < grid.N_z; j++) {
+		p_ped[i, j] = hmode_cond.p_ped(psi_N[i, j]);
+	  }
+	}
+  } else if (param.ictype == "diamagnetic") {
+	DiamagneticCondition &dia_cond = dynamic_cast<DiamagneticCondition&>(*cond.get());
+    for (int i = 0; i < grid.N_r; i++) {
+	  for (int j = 0; j < grid.N_z; j++) {
+		f_delta[i, j] = dia_cond.f_delta(psi_N[i, j]);
+	  }
+	}
+  }    
+
+  netCDF::NcFile file(param.ofname, netCDF::NcFile::replace);
   store_vector(file, psi_range, "psi_range", psi_range.size(), "psi_range");
   store_vector(file, p_range, "p_range", p_range.size(), "psi_range");
   store_vector(file, f_range, "f_range", f_range.size(), "psi_range");
@@ -1188,6 +1205,12 @@ int main() {
   store_field(file, psi, "psi", {"r", "z"});
   store_field(file, F, "F", {"r", "z"});
   store_field(file, p, "p", {"r", "z"});
+  if (param.ictype == "hmode") {
+	store_field(file, p_ped, "p_ped", {"r", "z"});
+  }    
+  if (param.ictype == "diamagnetic") {
+	store_field(file, f_delta, "f_delta", {"r", "z"});
+  }    
   store_field(file, f, "f", {"r", "z"});
   store_vectorfield(file, J, "J", {"r", "z"});
   store_vectorfield(file, B, "B", {"r", "z"});

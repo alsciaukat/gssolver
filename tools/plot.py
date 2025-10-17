@@ -124,7 +124,7 @@ def extract_test(fname: str):
 
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         streams = ax.streamplot(R.T, Z.T, v[:, :, 0].T, v[:, :, 2].T,
-                                color=v_mag.T, density=0.5,
+                                color=v_mag.T, density=0.9, arrowsize=3,
                                 broken_streamlines=False, linewidth=2)
         fig.colorbar(plt.cm.ScalarMappable(
                 norm=plt.Normalize(v_mag.min(), v_mag.max()),
@@ -135,7 +135,7 @@ def extract_test(fname: str):
         del fig, ax
 
 
-def extract_plots(fname: str):
+def extract_plots(fname: str, ictype: str):
     file = Dataset(fname, "r")
     prefix = "assets/" + fname + "_"
     r = file.variables["r"][:]
@@ -162,8 +162,8 @@ def extract_plots(fname: str):
 
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         streams = ax.streamplot(R.T, Z.T, v[:, :, 0].T, v[:, :, 2].T,
-                                color=v_mag.T, density=1,
-                                broken_streamlines=False, linewidth=1)
+                                color=v_mag.T, density=0.9, arrowsize=3,
+                                broken_streamlines=False, linewidth=2)
         fig.colorbar(plt.cm.ScalarMappable(
                 norm=plt.Normalize(v_mag.min(), v_mag.max()),
                 cmap=streams.lines.get_cmap()),
@@ -177,7 +177,7 @@ def extract_plots(fname: str):
         v = file.variables[name][:]
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         ax.plot(r, v[:, zi, 1])
-        ax.set(xlabel="$r$ [m]", ylabel=label, title=title)
+        ax.set(xlim=(1.35, 2.15), xlabel="$r$ [m]", ylabel=label, title=title)
         fig.savefig(prefix + name + "phi_axis.png")
         del fig, ax
 
@@ -202,7 +202,7 @@ def extract_plots(fname: str):
         v_range = file.variables[name + "_range"][:]
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         ax.plot(r, v[:, zi])
-        ax.set(xlabel="$r$ [m]", ylabel=label, title=title)
+        ax.set(xlim=(1.35, 2.15), xlabel="$r$ [m]", ylabel=label, title=title)
         fig.savefig(prefix + name + "_axis.png")
         del fig, ax
 
@@ -213,34 +213,66 @@ def extract_plots(fname: str):
         fig.colorbar(contours, label=label)
         fig.savefig(prefix + name + ".png")
         del fig, ax, contours
-        
+
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         ax.plot(psi_range, v_range)
+        ax.set(xlabel=r"$\psi$ [$\rm Tm^2$]", ylabel=label, title=title)
         fig.savefig(prefix + name + "_range.png")
         del fig, ax
+    if ictype.lower() == "hmode":
+        p_H = file.variables["p"][:]
+        p_ped = file.variables["p_ped"][:]
+        p_L = p_H - p_ped
+        v_range = file.variables[name + "_range"][:]
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.plot(r, p_H[:, zi], label="H-mode")
+        ax.plot(r, p_ped[:, zi], label="Pedestal")
+        ax.plot(r, p_L[:, zi], label="L-mode")
+        ax.set(xlim=(1.35, 2.15), xlabel="$r$ [m]", ylabel=r"$p$ [Pa]", title="High-confinement mode profile")
+        ax.legend()
+        fig.savefig(prefix + "p_ped_axis.png")
+        del fig, ax
+    if ictype.lower() == "diamagnetic":
+        B_phi = file.variables["f"][:] / r[:, None]
+        B_phi_delta = file.variables["f_delta"][:] / r[:, None]
+        B_phi_bg = B_phi - B_phi_delta
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.plot(r, B_phi[:, zi], label="Total")
+        ax.plot(r, B_phi_bg[:, zi], label="Background")
+        ax.set(xlim=(1.35, 2.15), xlabel="$r$ [m]", ylabel=r"$B_\phi$ [T]", title="Diamagnetic")
+        ax.legend()
+        fig.savefig(prefix + "B_delta_axis.png")
+        del fig, ax
+    file.close()
 
 
 if __name__ == "__main__":
     parser = ArgumentParser(prog="plot.py",
                             description="Convert between file formats.")
     parser.add_argument("-f")
+    parser.add_argument("-t")
     args = parser.parse_args()
-    if (args.f is None):
-        while not os.path.exists(".git"):
-            if os.path.abspath(os.curdir) == "/":
-                raise Exception("Not in a valid project. Create Git repo.")
-            os.chdir("..")
-        with open("config.toml", "rb") as f:
-            config = tomllib.load(f)
+    while not os.path.exists(".git"):
+        if os.path.abspath(os.curdir) == "/":
+            raise Exception("Not in a valid project. Create Git repo.")
+        os.chdir("..")
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+        if not args.f:
             fname = config["output"]["name"]
-    else:
-        fname = args.f
+        else:
+            fname = args.f
+        if not args.t:
+            ictype = config["initial_condition"]["type"]
+        else:
+            ictype = args.t
+
     plt.rcParams.update({
         "text.usetex": True,
         "font.family": "serif",
         "font.serif": ["Computer Modern Roman"],
-        "font.size": 24,
+        "font.size": 18,
         "figure.dpi": 200
         })
 
-    extract_test(fname)
+    extract_plots(fname, ictype)

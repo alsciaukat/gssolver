@@ -14,7 +14,7 @@ select = "default"
 type = "solovev"
 
 # The number of points in the r direction
-N = 150
+N = 300
 
 
 [output]
@@ -59,8 +59,8 @@ e_min = 1e-5
 # it helps the convergence to happen more quickly.
 # 
 # I_p = 500e3 in KSTAR
-I_p = 20000
-sigma0 = 760
+I_p = 3000
+sigma0 = 900
 psi_bdry = 1
 
 # fixed psi at the boundary
@@ -74,7 +74,6 @@ normalize = false
 # "solovev", "polynomial", "HMode", "diamagnetic" are supported.
 type = "hmode"
 
-B0 = 2.5
 
 #### polynomial ####
 # beta0 = 0.5
@@ -89,38 +88,44 @@ B0 = 2.5
 ## pedestal(psi_N) = | 0,         if psi_N > psi_end,
 ##                   \ p_a ( 1 - [(psi_N - psi_start)/(psi_end - psi_start)]^p )^q, otherwise.
 
-p0 = 1000
+p0 = 100
 m = 3
 n = 7
 
-p_a = 200
-psi_start = 0.6
+p_a = 20
+psi_start = 0.5
 psi_end = 0.7
 p = 2
-q = 9
+q = 2
 
 ## f(psi_N) = B0 R + f_a ( 1 - psi_N^r )^s
+B0 = 3.5
 f_a = 1e-4
-r = 2
+r = 1
 s = 2
 
 
 #### diamagnetic ####
 ## p(psi_N) = p0 ( 1 - psi_N^m )^n
 
-# p0 = 1e5
-# m = 2
+# p0 = 100
+# m = 1
 # n = 2
 
-## f(psi_N) = B0 R + f_b ( psi^p - psi_start^p )^q ( psi_end^p - psi^p )^q
+## f(psi_N) = B0 R + f_b ( psi_N^p - psi_start^p )^q ( psi_end^p - psi_N^p )^q /
+##                       (
+##                         (((psi_start + psi_end)/2)^p - psi_start^p)^q *
+##                         (psi_end^p - ((psi_start + psi_end)/2)^p )^q
+##                       )
 ##            + f_a ( 1 - psi_N^r )^s
 ## if f_b > 0 the plasma is paramagnetic, otherwise it is diamagnetic.
 
 ## high perturbation in B_phi exacerbates the convergence.
-# f_a = 1e-5
-# f_b = 2e-4
-# psi_start = 0.1
-# psi_end = 0.5
+# B0 = 1e-3
+# f_a = 1e-4
+# f_b = -2e-4
+# psi_start = 0.3
+# psi_end = 0.8
 # p = 1
 # q = 3
 # r = 5
