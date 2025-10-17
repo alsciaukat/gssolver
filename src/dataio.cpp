@@ -86,6 +86,33 @@ int store_field(NcFile &file, Field<double> &field, const std::string vname,
   return EXIT_SUCCESS;
 }
 
+int store_vectorfield(netCDF::NcFile &file, Field<Vector> &field, const std::string vname, const std::vector<std::string> axnames) {
+  const Grid &grid = field.grid;
+  std::vector<double> field_f;
+  field_f.reserve(grid.N_r * grid.N_z * 3);
+  for (Vector x : field.value | std::views::join) {
+	field_f.push_back(x.r);
+	field_f.push_back(x.phi);
+	field_f.push_back(x.z);
+  }
+  if (axnames.size() < 2) throw std::invalid_argument("At least two axes names must be provided by `axnames`.");
+  NcDim ax1Dim;
+  NcDim ax2Dim;
+  NcDim compDim;
+  NcVar field_v;
+  ax1Dim = file.getDim(axnames[0]);
+  if (ax1Dim.isNull()) ax1Dim = file.addDim(axnames[0], grid.N_r);
+  ax2Dim = file.getDim(axnames[1]);
+  if (ax2Dim.isNull()) ax2Dim = file.addDim(axnames[1], grid.N_z);
+  compDim = file.getDim("comp");
+  if (compDim.isNull()) compDim = file.addDim("comp", 3);
+  
+  std::vector<NcDim> dims = {ax1Dim, ax2Dim, compDim};
+  field_v = file.addVar(vname, ncDouble, dims);
+  field_v.putVar(field_f.data());
+  return EXIT_SUCCESS;
+}
+
 int store_vector(netCDF::NcFile &file, const std::vector<double> &vector,
                  const std::string vname, const size_t size,
                  const std::string axname) {

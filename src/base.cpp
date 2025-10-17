@@ -32,7 +32,7 @@ Grid::Grid(const Parameters &param)
 	  tolerance(param.tolerance) {
   /*
     Solov'ev's solution is used to set the boundary.
-    The p(psi) and g(psi) might not match the
+    The p(psi) and f(psi) might not match the
     Solov'ev's, but they are used anyway assuming that it is not going to be far
     from the reality.
 
@@ -143,7 +143,7 @@ double Grid::solovev(double r, double z) const {
 }
 
 template class Field<double>;
-
+template class Field<Vector>;
 
 // interpolation is done using the second order Newton polynomials
 template <typename T>
@@ -186,38 +186,110 @@ Field<T> &Field<T>::operator=(const Field<T> &other) {
 InitialCondition::InitialCondition(const Parameters &param) : param(param) {};
 
 
-double SolovevCondition::p_prime(double psi, double r) {
+double SolovevCondition::p_prime(double psi) const {
   return - param.a / mu0;
 }
 
-double SolovevCondition::gg_prime(double psi, double r) {
+double SolovevCondition::ff_prime(double psi) const {
   return - param.b * param.R * param.R;
 }
 
-double PolynomialCondition::p_prime(double psi, double r) {
-  return - param.beta0 * std::pow(1 - std::pow(psi, param.m), param.n) / param.R;
+double PolynomialCondition::p_prime(double psi) const {
+  return - param.p0 * param.beta0 * std::pow(1 - std::pow(psi, param.m), param.n) / param.R;
 }
 
-double PolynomialCondition::gg_prime(double psi, double r) {
+double PolynomialCondition::ff_prime(double psi) const {
   return - (1 - param.beta0) * mu0 * param.R * std::pow(1 - std::pow(psi, param.m), param.n);
+}
+
+
+// HMode Conditions
+
+double HModeCondition::p(double psi) const {
+  double p = param.p0 * std::pow(1 - std::pow(psi, param.m), param.n);
+  if (psi < param.psi_start) {
+	p += param.p_a;
+  } else if (param.psi_start <= psi && psi <= param.psi_end) {
+	p += param.p_a * std::pow((1 - std::pow((psi - param.psi_start) / (param.psi_end - param.psi_start), param.p)), param.q);	
+  }    
+  return p;
 }  
 
-// H-mode p_prime, gg_prime
-// You can see plot of this profile and adjust parameters:
-// https://www.desmos.com/calculator/65uenvvx0u
+double HModeCondition::p_prime(double psi) const {
+  double p_prime = - param.n * param.m * std::pow(1-std::pow(psi, param.m), param.n - 1) * std::pow(psi, param.m - 1);
+  if (param.psi_start <= psi && psi <= param.psi_end) {
+	p_prime += -param.p_a * param.p * param.q * std::pow((psi - param.psi_start) / (param.psi_end - param.psi_start), param.p - 1) * std::pow((1 - std::pow((psi - param.psi_start) / (param.psi_end - param.psi_start), param.p)), param.q - 1) / (param.psi_end - param.psi_start);	
+  }    
+  return p_prime;
+}
 
-const double d = 0.02;
-const double betaH = 0.6;
-const double p_prime0 = 0.18;
-const double psi0 = 0.78;
-const double h = 0.9;
-const double D = 0.036;
-const double j_bs0 = 0.4;
+double HModeCondition::f(double psi) const {
+  double f = param.B0 * param.R;
+  f += param.f_a * std::pow(1 - std::pow(psi, param.r), param.s);
+  return f;
+}
 
-double HModeCondition::p_prime(double psi, double r) {
-  return - ( betaH * std::pow(1 - std::pow(psi, param.m), param.n) + p_prime0) * 0.5*h * (std::tanh( (psi0 - psi) / d ) + 1) / r;
+double HModeCondition::f_prime(double psi) const {
+  double f_prime = 0;
+  f_prime += - param.f_a * param.r * param.s * std::pow(1-std::pow(psi, param.r), param.s - 1) * std::pow(psi, param.r - 1);
+  return f_prime;
+}
+
+double HModeCondition::ff_prime(double psi) const {
+  return f(psi) * f_prime(psi);
+}
+
+
+// Diamagnetic
+
+double DiamagneticCondition::p(double psi) const {
+  return param.p0 * std::pow(1 - std::pow(psi, param.m), param.n);
 }  
 
-double HModeCondition::gg_prime(double psi, double r) {
-  return - mu0 * r * ( std::pow(1 - std::pow(psi, param.m), param.n) - ( betaH * std::pow(1 - std::pow(psi, param.m), param.n) + p_prime0) * 0.5*h * (std::tanh( (psi0 - psi) / d ) + 1) );
+double DiamagneticCondition::p_prime(double psi) const {
+  return - param.p0 * param.n * param.m * std::pow(1-std::pow(psi, param.m), param.n - 1) * std::pow(psi, param.m - 1);
+}
+
+double DiamagneticCondition::f(double psi) const {
+  double f = param.B0 * param.R;
+  f += param.f_a * std::pow(1 - std::pow(psi, param.r), param.s);
+  double delta_f =
+      param.f_b * std::pow(std::pow(psi, param.p) - std::pow(param.psi_start, param.p), param.q) *
+	std::pow(std::pow(param.psi_end, param.p) - std::pow(psi, param.p), param.q);
+  delta_f *= param.R;
+  delta_f /= std::pow(std::pow((param.psi_end + param.psi_start) / 2, param.p) - std::pow(param.psi_start, param.p), param.q) * std::pow(std::pow(param.psi_end, param.p) - std::pow((param.psi_end + param.psi_start) / 2, param.p), param.q);
+  if (!param.para && param.psi_start <= psi && psi <= param.psi_end) {
+    f = f - delta_f;
+  } else if (param.psi_start <= psi && psi <= param.psi_end) {
+    f = f + delta_f;
+  }    
+  return f;
+}
+
+double DiamagneticCondition::f_prime(double psi) const {
+  double f_prime = 0;
+  f_prime += - param.f_a * param.r * param.s * std::pow(1-std::pow(psi, param.r), param.s - 1) * std::pow(psi, param.r - 1);
+  double delta_f_prime =
+      param.p * param.f_b * param.q * std::pow(psi, param.p - 1) *
+          std::pow(std::pow(psi, param.p) - std::pow(param.psi_start, param.p),
+                   param.q - 1) *
+          std::pow(std::pow(param.psi_end, param.p) - std::pow(psi, param.p),
+                   param.q) -
+      param.f_b * param.p * param.q * std::pow(psi, param.p - 1) *
+          std::pow(std::pow(psi, param.p) - std::pow(param.psi_start, param.p),
+                   param.q) *
+          std::pow(std::pow(param.psi_end, param.p) - std::pow(psi, param.p),
+                   param.q - 1);
+  delta_f_prime *= param.R;
+  delta_f_prime /= std::pow(std::pow((param.psi_end + param.psi_start) / 2, param.p) - std::pow(param.psi_start, param.p), param.q) * std::pow(std::pow(param.psi_end, param.p) - std::pow((param.psi_end + param.psi_start) / 2, param.p), param.q);
+  if (!param.para && param.psi_start <= psi && psi <= param.psi_end) {
+    f_prime = f_prime - delta_f_prime;
+  } else if (param.psi_start <= psi && psi <= param.psi_end) {
+    f_prime = f_prime + delta_f_prime;
+  }    
+  return f_prime;
+}
+
+double DiamagneticCondition::ff_prime(double psi) const {
+  return f(psi) * f_prime(psi);
 }  

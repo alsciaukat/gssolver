@@ -2,6 +2,7 @@
 #define BASE_H
 
 #include <cstddef>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -33,15 +34,25 @@ struct Parameters {
   double I_p, psi_bdry;
   double psi_l;
   double sigma0;
+  double B0;
+  
   std::string ofname;
   std::string offormat;
   bool verbose;
+  int print_every;
   int N_gr;
   double logh_low;
   double delta_logh;
   std::string ictype;
   bool print;
-  double beta0, m, n;
+  double psi_start, psi_end;
+  double beta0;
+  double p_a;
+  int m, n;
+  double f_a, f_b;
+  int p, q, r, s;
+  bool para;
+  double p0;
   double A;
 };
 
@@ -89,34 +100,61 @@ public:
   T interpolate_r(int i, int j, double rr) const;
 };
 
-template class Field<Vector>;
-
 class InitialCondition {
 public:
   const Parameters &param;
   InitialCondition(const Parameters &param);
-  virtual double p_prime(double psi, double r) = 0;
-  virtual double gg_prime(double psi, double r) = 0;
+  virtual double p(double psi) const {
+	throw std::logic_error("Non Implemented");
+	return 0;
+  }
+  virtual double f(double psi) const {
+	throw std::logic_error("Non Implemented");
+	return 0;
+  }
+  virtual double p_prime(double psi) const {
+	throw std::logic_error("Non Implemented");
+	return 0;
+  }
+  virtual double f_prime(double psi) const {
+	throw std::logic_error("Non Implemented");
+	return 0;
+  }
+  virtual double ff_prime(double psi) const {
+	throw std::logic_error("Non Implemented");
+	return 0;
+  }
   virtual ~InitialCondition() = default;
 };
 
 class SolovevCondition : public InitialCondition {
 public:
   using InitialCondition::InitialCondition;
-  double p_prime(double psi, double r) override;  
-  double gg_prime(double psi, double r) override;  
+  double p_prime(double psi) const override;  
+  double ff_prime(double psi) const override;  
 };
 
 class PolynomialCondition : public InitialCondition {
   using InitialCondition::InitialCondition;
-  double p_prime(double psi, double r) override;  
-  double gg_prime(double psi, double r) override;  
+  double p_prime(double psi) const override;  
+  double ff_prime(double psi) const override;  
 };
 
 class HModeCondition : public InitialCondition {
   using InitialCondition::InitialCondition;
-  double p_prime(double psi, double r) override;  
-  double gg_prime(double psi, double r) override;  
+  double p(double psi) const override;
+  double f(double psi) const override;
+  double p_prime(double psi) const override;  
+  double f_prime(double psi) const override;  
+  double ff_prime(double psi) const override;  
 };
 
+class DiamagneticCondition : public InitialCondition {
+  using InitialCondition::InitialCondition;
+  double p(double psi) const override;
+  double f(double psi) const override;
+  double p_prime(double psi) const override;  
+  double f_prime(double psi) const override;  
+  double ff_prime(double psi) const override;  
+};
 #endif

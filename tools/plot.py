@@ -1,23 +1,15 @@
 #!/usr/bin/python
 
-import netCDF4 as nc
+from netCDF4 import Dataset
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+import os
+import tomllib
+from argparse import ArgumentParser
 
-
-def compare_solovev(numerical, theory, R, Z):
-    fig, axes = plt.subplots(1, 1, figsize=(10, 6))
-    overlay = axes.contourf(R, Z, theory, levels=np.linspace(0, 0.11, 11),
-                            cmap='viridis', alpha=0.5)
-    contours = axes.contour(R, Z, numerical, levels=np.linspace(0, 0.11, 11),
-                            cmap='plasma')
-    axes.set(xlabel="r", ylabel="z")
-    axes.axis("equal")
-
-    plt.clabel(contours, inline=True)
-    plt.colorbar(overlay)
-    plt.show()
+fig_w = 10
+fig_h = 7
 
 
 def compare(numerical, theory, R, Z):
@@ -34,16 +26,6 @@ def compare(numerical, theory, R, Z):
     plt.show()
 
 
-def show_psi(R, Z, field):
-    fig, axes = plt.subplots(1, 1, figsize=(10, 6))
-    contours = axes.contour(R, Z, field, levels=np.linspace(0, 1, 11),
-                            cmap='plasma')
-    axes.set(xlabel="r", ylabel="z", title="Contours of ψ(r,z)")
-    axes.axis("equal")
-    plt.colorbar(contours, label="ψ")
-    plt.show()
-
-
 def show_field(R, Z, field, title: str):
     fig, axes = plt.subplots(1, 1, figsize=(10, 6))
     contours = axes.contourf(R, Z, field, levels=40,
@@ -55,20 +37,12 @@ def show_field(R, Z, field, title: str):
 
 
 def plot_solovev():
-    file = nc.Dataset("solovev.nc", "r")
+    file = Dataset("solovev.nc", "r")
     h = file.variables["h"][:]
     N = file.variables["N"][:]
     max_error = file.variables["max_error"][:]
     l2_error = file.variables["l2_error"][:]
     time2run = file.variables["time2run"][:]
-
-    # n = int(sys.argv[1])
-    # psi = file.variables[f"psi{n}"][:]
-    # psi_t = file.variables[f"psi_t{n}"][:]
-    # r = file.variables[f"r{n}"][:]
-    # z = file.variables[f"z{n}"][:]
-    # R, Z = np.meshgrid(r, z, indexing="ij")
-    # compare(psi, psi_t, R, Z)
 
     logh = np.log10(h)
     loge = np.log10(l2_error)
@@ -90,7 +64,7 @@ def plot_solovev():
 
 
 def plot_iter_error():
-    file = nc.Dataset("test.nc", "r")
+    file = Dataset("test.nc", "r")
     max_errors = file.variables["max_error"][:]
     l2_errors = file.variables["l2_error"][:]
     plt.plot(l2_errors)
@@ -100,9 +74,8 @@ def plot_iter_error():
     plt.show()
 
 
-def debug():
-    file = nc.Dataset("test.nc", "r")
-    file2 = nc.Dataset("solovev.nc", "r")
+def overlay_solovev(file: Dataset):
+    file2 = Dataset("solovev.nc", "r")
     n = int(sys.argv[1])
     psi = file.variables[f"psi{n}"][:]
     psi_t = file2.variables["psi_t1"][:]
@@ -124,56 +97,150 @@ def debug():
     plt.colorbar(overlay)
     plt.show()
 
-def plot_output():
-    file = nc.Dataset("hmode_output.nc", "r")
-    psi = file.variables["psi"][:]
-    J_phi = file.variables["J_phi"][:]
-    J_r = file.variables["J_r"][:]
-    J_z = file.variables["J_z"][:]
-    B_phi = file.variables["B_phi"][:]
-    B_r = file.variables["B_r"][:]
-    B_z = file.variables["B_z"][:]
-    r = file.variables["r"][:]
-    z = file.variables["z"][:]
-    # psi_v = file.variables["psi_v"][:]
-    # p_prime = file.variables["p_prime"][:]
-    # gg_prime = file.variables["gg_prime"][:]
-    R, Z = np.meshgrid(r, z, indexing="ij")
-    overlay = plt.contourf(R, Z, B_r, levels=100, cmap='viridis', alpha=0.5)
-    plt.colorbar(overlay)
-    # plt.plot(psi_v, gg_prime)
-    plt.show()
 
-
-def extrct_plots():
-    file = nc.Dataset("poly_output.nc", "r")
-    prefix = "unnorm_poly"
+def extract_test(fname: str):
+    file = Dataset(fname, "r")
+    prefix = "assets/" + fname + "_"
     r = file.variables["r"][:]
     z = file.variables["z"][:]
     R, Z = np.meshgrid(r, z, indexing="ij")
-    for name in ["psi", "J_phi", "J_r", "J_z", "B_phi", "B_r", "B_z"]:
+    stride = 7
+    R_s, Z_s = np.meshgrid(r[::stride], z[::stride], indexing="ij")
+
+    for name, colorlabel, title in [("J", r"$J$ [$\rm A/m^2$]", r"Poloidal $J$"), ("B", r"$B$ [T]", r"Poloidal $B$")]:
         v = file.variables[name][:]
-        fig, ax = plt.subplots(1, 1)
-        overlay = ax.contourf(R, Z, v, levels=100, cmap='viridis', alpha=0.5)
-        ax.set(xlabel="r", ylabel="z", title=name)
-        fig.colorbar(overlay)
+        v_mag = np.sqrt(v[:, :, 0]**2 + v[:, :, 2]**2)
+        v_mag_s = np.sqrt(v[::stride, ::stride, 0]**2
+                          + v[::stride, ::stride, 2]**2)
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        quivers = ax.quiver(R_s, Z_s,
+                            v[::stride, ::stride, 0] /
+                            v_mag_s, v[::stride, ::stride, 2] / v_mag_s,
+                            v_mag_s, pivot='mid', width=0.006)
+        fig.colorbar(quivers, ax=ax, label=colorlabel)
+        ax.set(xlabel=r"$r$ [m]", ylabel=r"$z$ [m]", title=title, aspect="equal")
+        fig.savefig(prefix + name + "_quiver.png")
+        del fig, ax
+
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        streams = ax.streamplot(R.T, Z.T, v[:, :, 0].T, v[:, :, 2].T,
+                                color=v_mag.T, density=0.5,
+                                broken_streamlines=False, linewidth=2)
+        fig.colorbar(plt.cm.ScalarMappable(
+                norm=plt.Normalize(v_mag.min(), v_mag.max()),
+                cmap=streams.lines.get_cmap()),
+                     ax=ax, label=colorlabel)
+        ax.set(xlabel=r"$r$ [m]", ylabel=r"$z$ [m]", title=title, aspect="equal")
         fig.savefig(prefix + name + ".png")
-        del fig, ax, overlay
+        del fig, ax
+
+
+def extract_plots(fname: str):
+    file = Dataset(fname, "r")
+    prefix = "assets/" + fname + "_"
+    r = file.variables["r"][:]
+    z = file.variables["z"][:]
+    psi_range = file.variables["psi_range"][:]
+    R, Z = np.meshgrid(r, z, indexing="ij")
+    stride = 7
+    R_s, Z_s = np.meshgrid(r[::stride], z[::stride], indexing="ij")
+
+    for name, colorlabel, title in [("J", r"$J$ [$\rm A/m^2$]", r"Poloidal $J$"), ("B", r"$B$ [T]", r"Poloidal $B$")]:
+        v = file.variables[name][:]
+        v_mag = np.sqrt(v[:, :, 0]**2 + v[:, :, 2]**2)
+        v_mag_s = np.sqrt(v[::stride, ::stride, 0]**2
+                          + v[::stride, ::stride, 2]**2)
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        quivers = ax.quiver(R_s, Z_s,
+                            v[::stride, ::stride, 0] /
+                            v_mag_s, v[::stride, ::stride, 2] / v_mag_s,
+                            v_mag_s, pivot='mid', width=0.006)
+        fig.colorbar(quivers, ax=ax, label=colorlabel)
+        ax.set(xlabel=r"$r$ [m]", ylabel=r"$z$ [m]", title=title, aspect="equal")
+        fig.savefig(prefix + name + "_quiver.png")
+        del fig, ax
+
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        streams = ax.streamplot(R.T, Z.T, v[:, :, 0].T, v[:, :, 2].T,
+                                color=v_mag.T, density=1,
+                                broken_streamlines=False, linewidth=1)
+        fig.colorbar(plt.cm.ScalarMappable(
+                norm=plt.Normalize(v_mag.min(), v_mag.max()),
+                cmap=streams.lines.get_cmap()),
+                     ax=ax, label=colorlabel)
+        ax.set(xlabel=r"$r$ [m]", ylabel=r"$z$ [m]", title=title, aspect="equal")
+        fig.savefig(prefix + name + ".png")
+        del fig, ax
+
+    zi = np.argmin(np.abs(z))
+    for name, label, title in [("J", r"$J_\phi$ [$\rm A/m^2$]", "Toroidal $J$"), ("B", r"$B_\phi$ [T]", "Toroidal $B$")]:
+        v = file.variables[name][:]
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.plot(r, v[:, zi, 1])
+        ax.set(xlabel="$r$ [m]", ylabel=label, title=title)
+        fig.savefig(prefix + name + "phi_axis.png")
+        del fig, ax
+
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        contours = ax.contourf(R, Z, v[:, :, 1], levels=100,
+                               cmap='viridis')
+        ax.set(xlabel="$r$ [m]", ylabel="$z$ [m]", title=title)
+        fig.colorbar(contours, label=label)
+        fig.savefig(prefix + name + "phi.png")
+        del fig, ax, contours
+
+    for name, colorlabel, title in [("psi", r"$\psi$ [Tm]", r"$\psi$")]:
+        v = file.variables[name][:]
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        contours = ax.contourf(R, Z, v, levels=100, cmap='viridis')
+        ax.set(xlabel="$r$ [m]", ylabel="$z$ [m]", title=title)
+        fig.colorbar(contours, label=colorlabel)
+        fig.savefig(prefix + name + ".png")
+        del fig, ax, contours
+    for name, label, title in [("p", r"$p$ [Pa]", r"$p$"), ("f", r"$F$ [Tm]", r"$F$")]:
+        v = file.variables[name][:]
+        v_range = file.variables[name + "_range"][:]
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.plot(r, v[:, zi])
+        ax.set(xlabel="$r$ [m]", ylabel=label, title=title)
+        fig.savefig(prefix + name + "_axis.png")
+        del fig, ax
+
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        contours = ax.contourf(R, Z, v, levels=100,
+                               cmap='viridis')
+        ax.set(xlabel="$r$ [m]", ylabel="$z$ [m]", title=title)
+        fig.colorbar(contours, label=label)
+        fig.savefig(prefix + name + ".png")
+        del fig, ax, contours
+        
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.plot(psi_range, v_range)
+        fig.savefig(prefix + name + "_range.png")
+        del fig, ax
 
 
 if __name__ == "__main__":
-    # compare_solovev(psi_solovev, psi_theory, R_solovev, Z_solovev)
-    # compare(psi_poly, psi_theory_poly, R_poly, Z_poly)
-    # show_field(R_solovev, Z_solovev, J_phi_solovev, "J_ϕ")
-    # show_field(Rrp_solovev, Zrp_solovev, B_z_solovev, "B_z")
-    # show_psi(R_poly, Z_poly, psi_poly, "psi")
-    # show_field(Rrp_poly, Zrp_poly, B_z_poly, "B_z")
-    # show_field(R_poly, Z_poly, J_phi_poly, "J_ϕ")
-    # compare_solovev(psi, psi_t, R, Z)
-    # plot_iter_error()
-    # plot_solovev()
-    # debug()
-    # plot_output()
-    # file = nc.Dataset("l2_error.nc", "r")
-    extrct_plots()
-    # print(file.variables)
+    parser = ArgumentParser(prog="plot.py",
+                            description="Convert between file formats.")
+    parser.add_argument("-f")
+    args = parser.parse_args()
+    if (args.f is None):
+        while not os.path.exists(".git"):
+            if os.path.abspath(os.curdir) == "/":
+                raise Exception("Not in a valid project. Create Git repo.")
+            os.chdir("..")
+        with open("config.toml", "rb") as f:
+            config = tomllib.load(f)
+            fname = config["output"]["name"]
+    else:
+        fname = args.f
+    plt.rcParams.update({
+        "text.usetex": True,
+        "font.family": "serif",
+        "font.serif": ["Computer Modern Roman"],
+        "font.size": 24,
+        "figure.dpi": 200
+        })
+
+    extract_test(fname)

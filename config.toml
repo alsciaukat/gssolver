@@ -3,7 +3,10 @@
 # Look at the function `initialize` in `solver.cpp` for the default values. #
 #############################################################################
 
-select = "blender"
+# "solovev" for grid refinement test,
+# "polynomial" for Picard iteration convergence test,
+# anything else works fine.
+select = "default"
 
 [grid]
 
@@ -11,20 +14,20 @@ select = "blender"
 type = "solovev"
 
 # The number of points in the r direction
-N = 100
+N = 150
 
+
+[output]
 
 # The default format is chosen automatically
 # depending on the availability of libraries.
-[output]
-
-# "netCDF" and "csv" are supported.
-# The case does not matter.
+# "netCDF" and "csv" are supported. (case insensitive)
 # format = "netCDF"
 
 name = "hmode_output.nc"
 verbose = false
 print_psi = false
+print_every = 10
 
 N_gr = 17
 logh_low = -2.4
@@ -34,40 +37,94 @@ delta_logh = 0.1
 
 # relative error for the fixed-point iteration
 # maximum 1e-14, usual 1e-8
-e_fix = 1e-10
+e_fix = 1e-5
 
 # relative error for Succesive Over Relaxation
 # it suddenly takes very long if e_sor < 1e-14
 # it turns out low e_sor converges faster overall!
 # although it takes more iteration if it is too low.
-e_sor = 1e-5
+e_sor = 1e-4
 
 # relaxation coefficient. Diverges if ≥ 2.
 # fast but imprecise if close to 2, slow but precise close to 1
-omega = 1.8
+omega = 0.9
 
 # relative error for the minimum at the normalization step
-e_min = 1e-11
+e_min = 1e-5
 
-# The total current
-# I_p = 500e3
-I_p = 1000
-# psi at the computational boundary
+# Rough Guesses.
+#
+# These does not affect the final outcome.
+# If you have rough idea about these quantities,
+# it helps the convergence to happen more quickly.
+# 
+# I_p = 500e3 in KSTAR
+I_p = 20000
+sigma0 = 760
+psi_bdry = 1
+
+# fixed psi at the boundary
 psi_l = 1
 
-# psi at the physical plasma boudnary
-psi_bdry = 0.1
-
 normalize = false
-sigma0 = 1e4
 
 [initial_condition]
 
-# Choose p(psi) and g(psi)
-# "solovev", "polynomial", "HMode" are supported.
+# Choose p(psi) and f(psi)
+# "solovev", "polynomial", "HMode", "diamagnetic" are supported.
 type = "hmode"
-beta0 = 0.5
-m = 2
-n = 1
+
+B0 = 2.5
+
+#### polynomial ####
+# beta0 = 0.5
+# m = 2
+# n = 2
+
+
+#### hmode ####
+## p(psi_N) = p0 ( 1 - psi_N^m )^n + pedestal(psi_N)
+##
+##                   / p_a,        if psi_N < psi_start,
+## pedestal(psi_N) = | 0,         if psi_N > psi_end,
+##                   \ p_a ( 1 - [(psi_N - psi_start)/(psi_end - psi_start)]^p )^q, otherwise.
+
+p0 = 1000
+m = 3
+n = 7
+
+p_a = 200
+psi_start = 0.6
+psi_end = 0.7
+p = 2
+q = 9
+
+## f(psi_N) = B0 R + f_a ( 1 - psi_N^r )^s
+f_a = 1e-4
+r = 2
+s = 2
+
+
+#### diamagnetic ####
+## p(psi_N) = p0 ( 1 - psi_N^m )^n
+
+# p0 = 1e5
+# m = 2
+# n = 2
+
+## f(psi_N) = B0 R + f_b ( psi^p - psi_start^p )^q ( psi_end^p - psi^p )^q
+##            + f_a ( 1 - psi_N^r )^s
+## if f_b > 0 the plasma is paramagnetic, otherwise it is diamagnetic.
+
+## high perturbation in B_phi exacerbates the convergence.
+# f_a = 1e-5
+# f_b = 2e-4
+# psi_start = 0.1
+# psi_end = 0.5
+# p = 1
+# q = 3
+# r = 5
+# s = 2
+
 
 

@@ -1,6 +1,10 @@
-.PHONY: run debug plot
+.PHONY: default run debug plot
 
-run: ./build/solver
+default: ./build/solver
+	./build/solver
+	python ./tools/plot.py
+
+run:
 	./build/solver
 
 plot:
